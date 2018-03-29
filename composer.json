@@ -1,0 +1,14 @@
+{
+    "name": "vendor/chores-tracker",
+    "description": "Track your chores, categorize them, set frequency and priorities.",
+    "authors": [
+        {
+            "name": "Andrius.Ramanauskas",
+            "email": "knutux@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {"Chores\\": "src/"}
+    },
+    "require": {}
+}
