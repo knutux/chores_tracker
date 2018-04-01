@@ -50,7 +50,10 @@ class Model
             return TRUE;
             }
         else
+            {
+            session_destroy();
             return FALSE;
+            }
         }
 
     public function getJson ()
@@ -64,7 +67,9 @@ class Model
                 [
                     'version' => $db->getVersion(),
                     'mode' => 'category',
-                    'categories' => $this->collectCategories($db)
+                    'categories' => $this->collectCategories($db),
+                    'tasks' => $this->collectTasks($db),
+                    'selectedCategory' => 0
                 ];
         $this->model->errors = $this->errors;
         }
@@ -87,5 +92,30 @@ class Model
             $cat->parentId = $row['Parent Id'] ?? 0;
             return $cat;
             }, $categories ?? []);
+        }
+        
+    protected function collectTasks (Database $db)
+        {
+        $rows = $db->selectTasks($error);
+        if (false === $rows)
+            {
+            $this->errors[] = $error;
+            return [];
+            }
+
+        return array_map(function ($row)
+            {
+            $cat = new \stdClass();
+            $cat->categoryId = $row['Category Id'];
+            $cat->label = $row['Label'];
+            $cat->notes = $row['Notes'];
+            $cat->id = $row['Id'];
+            $cat->frequency = $row['Frequency'];
+            $cat->nextDate = $row['Next Date'];
+            $cat->diff = round((strtotime(date('Y-m-d')) - strtotime($row['Next Date'])) / (24 * 60 * 60));
+            $cat->cost = $row['Cost'];
+            $cat->lastDate = $row['Last Date'];
+            return $cat;
+            }, $rows ?? []);
         }
     }

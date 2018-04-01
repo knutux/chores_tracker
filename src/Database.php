@@ -14,7 +14,7 @@ class Database extends DatabaseCore
     const TABLE_CHORES_COMPLETED = "Chores Completion";
     const TABLE_CHORES_SCHEDULE = "Chores Schedule";
 
-    private function  __construct (bool $debug = false)
+    protected function  __construct (bool $debug = false)
         {
         parent::__construct ($debug);
         }
@@ -90,6 +90,24 @@ SELECT cat.`Id`, cat.`Label`, cat.`Parent Id`,
 WHERE $permissionFilter
 GROUP BY cat.`Id`, cat.`Label`, cat.`Parent Id`
 ORDER BY `Priority` ASC
+EOT;
+        $rows = $this->executeSelect ($tableName, $sql, $error);
+        return $rows;
+        }
+        
+    public function selectTasks(string &$error = null)
+        {
+        $tableName = self::TABLE_CHORES;
+        $tableCompleted = self::TABLE_CHORES_COMPLETED;
+        $permissionFilter = $this->createPermissionFilter ('Permission Group');
+        $sql = <<<EOT
+SELECT ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`,
+       MAX(lt.`Date`) `Last Date`
+ FROM `$tableName` ch
+ LEFT OUTER JOIN `$tableCompleted` lt ON lt.`Chores Id` = ch.`Id`
+WHERE $permissionFilter
+GROUP BY ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`
+ORDER BY (ch.`Next Date`-DATE('now')) * ch.`Frequency` ASC
 EOT;
         $rows = $this->executeSelect ($tableName, $sql, $error);
         return $rows;
