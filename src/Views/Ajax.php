@@ -23,6 +23,11 @@ class Ajax
         echo json_encode ((object)['errors' => [$err], 'success' => false, 'result' => null]);
         }
         
+    public static function getStringParam (array $postArgs, string $name, bool $default = null) : ?string
+        {
+        return $postArgs[$name] ?? $default;
+        }
+        
     public static function getBooleanParam (array $postArgs, string $name, bool $default = false) : bool
         {
         return ($postArgs[$name] ?? $default) == true;
@@ -37,15 +42,21 @@ class Ajax
     public static function handleMessage (\Chores\Database $db, \Chores\Model $model, array $postArgs = null)
         {        
         $message = $postArgs['fn'] ?? null;
+        $message = preg_split ('/:/', $message, 2);
         
-        switch ($message)
+        switch ($message[0])
             {
             case "done":
                 $id = self::getIntegerParam($postArgs, 'id');
                 $result = $model->markTaskDone ($db, $id, self::getBooleanParam($postArgs, 'today', true));
                 break;
+            case "edit":
+                $type = $message[1] ?? '??';
+                $id = self::getIntegerParam($postArgs, 'id');
+                $result = $model->editInstance ($db, $type, $id, $postArgs);
+                break;
             default:
-                self::writeError("Unrecognized action ($message)", 500);
+                self::writeError("Unrecognized action ($message[0]])", 500);
                 exit();
             }
         

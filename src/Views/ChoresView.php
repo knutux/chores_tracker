@@ -15,6 +15,8 @@ namespace Chores\Views;
  */
 class ChoresView
     {
+    const ID_EDIT_TASKS_DLG = 'edit-task-dialog';
+    
     public static function write (\Chores\Model $model)
         {
 ?>
@@ -27,6 +29,7 @@ class ChoresView
     </div>
 </div>
 <?=self::writeScripts($model)?>
+
 <?php
         }
 
@@ -120,18 +123,18 @@ class ChoresView
                     <div data-bind="if: cost() == 0" class="text-muted">N/A</div>
                 </td>
                 <td class="btn-group" role="group" aria-label="Actions">
-                    <button role="button" data-bind="click:markDone" class="btn btn-success">
+                    <button role="button" data-bind="click:markDone, disabled: executing, css: {disabled: executing}" class="btn btn-success">
                         <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
                         <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
                         Done
                     </button>
                     <div class="btn-group" role="group">
-                        <button id="btnGroupDrop1" type="button" class="btn btn-light dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="btnGroupDrop1" data-bind="disabled: executing, css: {disabled: executing}" type="button" class="btn btn-light dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                           <span data-bind="ifnot:executing"><i class="fa fa-ellipsis-h"></i></span></span>
                           <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
                         </button>
                         <div class="dropdown-menu dropdown-menu-right" aria-labelledby="btnGroupDrop1">
-                          <a class="dropdown-item" href="#">
+                          <a class="dropdown-item" href="#" data-toggle="modal" data-target="#<?=self::ID_EDIT_TASKS_DLG?>" data-bind="click: edit">
                               <span data-bind="ifnot:executing"><i class="fa fa-pencil"></i></span></span>
                               <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
                               Edit
@@ -151,9 +154,15 @@ class ChoresView
 <?php
         }
 
+    public static function writeEditTaskDialog (\Chores\Model $model) : \stdClass
+        {
+        return Common::writeEditForm(self::ID_EDIT_TASKS_DLG, $model->getTaskPropertyMap());
+        }
+
     public static function writeScripts (\Chores\Model $model)
         {
         Common::writeCommonScripts();
+        $initTasksDialog = self::writeEditTaskDialog($model);
 ?>
 <script>
     function cacheHierarchy (model)
@@ -212,6 +221,7 @@ class ChoresView
             } 
         row.edit = function ()
             {
+            <?=$initTasksDialog->editFn?>(model, 'Edit task ' + row.label(), 'edit:task', 'Update', row, updateRow);
             }
         row.markDone = function ()
             {
@@ -247,12 +257,14 @@ class ChoresView
             });
         $model.selectedTasks = ko.computed (function ()
             {
-            return $.grep ($model.tasks(), function (el) { return isInHierarchy($model, ko.unwrap(ko.unwrap(el).categoryId)); });
+            var filter = function (el) { return isInHierarchy($model, ko.unwrap(ko.unwrap(el).categoryId)); };
+            return $.grep ($model.tasks(), filter).sort(function (a, b) { return b.diff() - a.diff(); });
             });
         adjustCategories($model);
         adjustTasks($model);
         $model.selectedCategory.extend({ urlSync: "s_c" });
         $model.selectedTab = ko.observable('categories').extend({ urlSync: "t_b" });
+        <?=$initTasksDialog->initFn?>($model);
         }
 </script>
 <?php

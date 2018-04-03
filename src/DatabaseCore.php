@@ -75,7 +75,7 @@ abstract class DatabaseCore
     public function escapeString (string $str = null, bool $addQuotes = false) : string
         {
         $string = $this->db->escapeString ($str);
-        return $addQuotes ? "'$string'" : $string;
+        return $addQuotes ? (null === $str ? 'NULL' : "'$string'") : $string;
         }
 
     public function encodePassword (string $user, string $password) : string
@@ -226,7 +226,7 @@ EOT;
         return $this->db->lastInsertRowID ();
         }
 
-    public function executeUpdate ($tableName, $setAndWhere, $accessAlreadyChecked = false)
+    public function executeUpdate ($tableName, $setAndWhere, &$error = null, $accessAlreadyChecked = false)
         {
         $permissionFilter = $accessAlreadyChecked ? "1=1" : $this->createPermissionFilter ('Permission Group');
         $sql = "UPDATE `$tableName` $setAndWhere AND $permissionFilter";
@@ -236,7 +236,7 @@ EOT;
         return true;
         }
         
-    protected function executeSelectSingle (string $tableName, string $sql, string &$error = null)
+    public function executeSelectSingle (string $tableName, string $sql, string &$error = null)
         {
         $ret = @$this->db->querySingle($sql);
         if (!$this->checkExecutionError (false !== $ret, $sql, $error))

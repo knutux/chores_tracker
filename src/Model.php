@@ -19,6 +19,7 @@ class Model
     private $errors = [];
     
     const SESSION_VERSION = 2;
+    const PREFIX_OLD_ID = "old_";
 
     public function isLoggedIn (Database $db, $postData, &$error = null)
         {
@@ -79,22 +80,145 @@ class Model
                 ];
         }
 
-    protected function getCategoryPropertyMap ()
+    public static function createFieldDefinition (string $label, string $type = "text", string $placeholder = null) : \stdClass
         {
-        return ['label' => 'Label', 'pendingToday' => 'Pending',
-                'tasks' => 'Tasks', 'id' => 'Id', 'parentId' => 'Parent Id'];
+        return (object)['dbName' => $label, 'label' => $label, 'type' => $type, 'placeholder' => $placeholder, 'readonly' => false, 'isId' => false];
+        }
+
+    public static function createCalculatedFieldDefinition (string $id, callable $fn) : \stdClass
+        {
+        $field = self::createFieldDefinition ($id);
+        $field->readonly = true;
+        $field->dbName = $fn;
+        return $field;
+        }
+
+    public static function markFieldReadonly (\stdClass $field) : \stdClass
+        {
+        $field->readonly = true;
+        return $field;
+        }
+
+    public static function markIdField (\stdClass $field) : \stdClass
+        {
+        $field->readonly = true;
+        $field->isId = true;
+        return $field;
+        }
+
+    public static function getCategoryPropertyMap ()
+        {
+        return ['label' => self::createFieldDefinition('Label'),
+                'pendingToday' => self::markFieldReadonly(self::createFieldDefinition('Pending')),
+                'tasks' => self::markFieldReadonly(self::createFieldDefinition('Tasks')),
+                'id' => self::markIdField(self::createFieldDefinition('Id')),
+                'parentId' => self::markFieldReadonly(self::createFieldDefinition('Parent Id')),
+            ];
         }
         
-    protected function getTaskPropertyMap ()
+    public static function getTaskPropertyMap ()
         {
-        return ['label' => 'Label', 'categoryId' => 'Category Id', 'notes' => 'Notes',
-                'frequency' => 'Frequency', 'nextDate' => 'Next Date', 'cost' => 'Cost',
-                'id' => 'Id', 'lastDate' => 'Last Date',
-                'diff' => function ($row)
+        return
+            [
+            'label' => self::createFieldDefinition('Label'),
+            'categoryId' => self::markFieldReadonly(self::createFieldDefinition('Category Id')),
+            'notes' => self::createFieldDefinition('Notes'),
+            'frequency' => self::createFieldDefinition('Frequency', 'number'),
+            'nextDate' => self::createFieldDefinition('Next Date', 'date'),
+            'cost' => self::createFieldDefinition('Cost', 'number'),
+            'id' => self::markIdField(self::createFieldDefinition('Id')),
+            'lastDate' => self::markFieldReadonly(self::createFieldDefinition('Last Date', 'date')),
+            'diff' => self::createCalculatedFieldDefinition('Diff', function ($row)
                     {
                     return round((strtotime(date('Y-m-d')) - strtotime($row['Next Date'])) / (24 * 60 * 60));
-                    }
-               ];
+                    }),
+                
+            ];
+        }
+        
+    public function editInstance (Database $db, string $type, int $id, array $postArgs) : \stdClass
+        {
+        $model = $this->createModelObject ($db);
+        $model->success = false;
+        $tableName = false;
+        $props = false;
+        
+        switch ($type)
+            {
+            case 'task':
+                $tableName = \Chores\Database::TABLE_CHORES;
+                $props = self::getTaskPropertyMap();
+                break;
+            default:
+                break;
+            }
+        
+        if (!is_numeric($id) || $id <= 0 || empty ($tableName))
+            {
+            $model->errors[] = "Invalid arguments - ($type/$id)";
+            return $model;
+            }
+
+        foreach ($props as $propId => $prop)
+            {
+            if ($prop->readonly)
+                continue;
+            
+            $oldValueId = self::PREFIX_OLD_ID.$propId;
+            $newValueId = $propId;
+            if (!isset ($postArgs[$oldValueId]) || !isset ($postArgs[$newValueId]) || $postArgs[$newValueId] == $postArgs[$oldValueId])
+                continue;
+            
+            $val = $db->escapeString($postArgs[$newValueId], true);
+            $oldVal = $db->escapeString($postArgs[$oldValueId], true);
+            $updateValues[] = "`{$prop->dbName}`=$val";
+            $whereOld[] = "`{$prop->dbName}`=$oldVal";
+            }
+            
+        if (empty ($updateValues))
+            {
+            $model->errors[] = "Nothing to update";
+            return $model;
+            }
+
+        $updateValues = implode (", ", $updateValues);
+        $whereOld = implode (" AND ", $whereOld);
+        $sql = "SET $updateValues WHERE `Id`=$id AND $whereOld";
+        if (false === $db->executeUpdate ($tableName, $sql, $error))
+            return $model;
+        
+        $affected = $db->executeSelectSingle ($tableName, "SELECT changes()", $error);
+        if (false === $db->executeUpdate ($tableName, $sql, $error))
+            return $model;
+        
+        if (0 == $affected)
+            {
+            $model->errors[] = "Error changing the instance - someone might have already changesd part of the same instance recently. Please reload and retry";
+            return $model;
+            }
+            
+        switch ($type)
+            {
+            case 'task':
+                $row = $db->selectSingleTasks ($id, $error);
+                break;
+            default:
+                $model->errors[] = "This object type is not fully supported - updated successfully, but cannot refresh the view";
+                return $model;
+            }
+            
+        if (false === $row)
+            {
+            $model->errors[] = $error;
+            return $model;
+            }
+        
+        $model->props = array_keys($props);
+        $instance = $this->mapDBPropertiesToModelSingle ($row, $props);
+
+        $model->row = $instance;
+        $model->success = true;
+        return $model;
         }
         
     public function prepare (Database $db)
@@ -200,14 +324,7 @@ EOT;
         $props = $this->getTaskPropertyMap ();
         $model->props = array_keys($props);
 
-        $instance = new \stdClass();
-        foreach ($props as $modelProp => $dbProp)
-            {
-            if (is_callable($dbProp))
-                $instance->{$modelProp} = $dbProp($row);
-            else
-                $instance->{$modelProp} = $row[$dbProp];
-            }
+        $instance = $this->mapDBPropertiesToModelSingle ($row, $props);
 
         $model->row = $instance;
         $model->success = true;
@@ -385,21 +502,26 @@ EOT;
         return $rows;
         }
         
+    protected function mapDBPropertiesToModelSingle (array $row, array $props = null) : \stdClass
+        {
+        $cat = new \stdClass();
+
+        foreach ($props as $modelProp => $dbProp)
+            {
+            if (is_callable($dbProp->dbName))
+                $cat->{$modelProp} = call_user_func($dbProp->dbName, $row);
+            else
+                $cat->{$modelProp} = $row[$dbProp->dbName];
+            }
+        return $cat;
+        }
+        
     protected function mapDBPropertiesToModel (array $rows = null, array $props = null) : array
         {
         //var_dump ($rows, $props);
         return array_map(function ($row) use ($props)
             {
-            $cat = new \stdClass();
-            
-            foreach ($props as $modelProp => $dbProp)
-                {
-                if (is_callable($dbProp))
-                    $cat->{$modelProp} = $dbProp($row);
-                else
-                    $cat->{$modelProp} = $row[$dbProp];
-                }
-            return $cat;
+            return $this->mapDBPropertiesToModelSingle ($row, $props);
             }, $rows ?? []);
         }
         

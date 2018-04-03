@@ -86,7 +86,7 @@ class Database extends DatabaseCore
 SELECT cat.`Id`, cat.`Label`, (CASE WHEN cat.`Parent Id` IS NULL THEN 0 ELSE cat.`Parent Id` END) `Parent Id`,
        COUNT(ch.`Id`) `Tasks`, COUNT(CASE WHEN ch.`Next Date` <= DATE('now') THEN 1 ELSE NULL END) `Pending`
  FROM `$tableName` cat
- LEFT OUTER JOIN `$tableChores` ch ON ch.`Path` LIKE cat.`Path` || '_' || cat.`Id` || '_%'
+ LEFT OUTER JOIN `$tableChores` ch ON ch.`Path` LIKE cat.`Path` || '\_' || cat.`Id` || '\_%' ESCAPE '\'
 WHERE $permissionFilter
 GROUP BY cat.`Id`, cat.`Label`, cat.`Parent Id`
 ORDER BY `Priority` ASC

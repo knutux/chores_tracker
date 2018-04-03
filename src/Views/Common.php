@@ -69,10 +69,12 @@ class Common
     public static function writeBoundErrors (string $param = "errors")
         {
 ?>
+    <div data-bind="visible: <?=$param?>" class="display:none">
     <div data-bind="foreach: <?=$param?>">
         <div class="alert alert-danger">
             <strong>Error!</strong> <span data-bind="text:$data"></span>
         </div>
+    </div>
     </div>
 <?php
         }
@@ -146,6 +148,9 @@ class Common
 <script>
     function ajaxCall (baseUrl, fn, data, model, progress, successCallback)
         {
+        if (progress())
+            return; // already in the middle of the operation
+        
         data['fn'] = fn;
         
         model.errors.removeAll();
@@ -172,6 +177,8 @@ class Common
             error:  function (jqXHR, textStatus, errorThrown)
                 {
                 progress(false);
+                if (jqXHR.responseJSON && jqXHR.responseJSON.errors)
+                    model.errors(jqXHR.responseJSON.errors);
                 model.errors.push ("Error - " + errorThrown);
                 },
             });
@@ -180,4 +187,99 @@ class Common
 <?php
         }
 
+    public static function writeEditForm (string $dialogId, array $params) : \stdClass
+        {
+        $dialogJSVariable = preg_replace('/[-]/', '_', $dialogId);
+        $initFn = 'init'.$dialogJSVariable;
+?>
+ <div id="<?=$dialogId?>" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="<?=$dialogId?>-label" data-bind="with: <?=$dialogJSVariable?>">
+  <div class="modal-dialog modal-lg" role="document" style="z-index: 2000">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="<?=$dialogId?>-label" data-bind="text:dialogTitle">Edit</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <div class="modal-body">
+         <div class="errors" data-bind="foreach: errors">
+            <div class="alert alert-dismissible alert-danger"><p data-bind="text: $data"></p></div>
+         </div>
+        <form>
+<?php
+        $visibleParams = [];
+        foreach ($params as $id => $def)
+            {
+            if ($def->readonly)
+                continue;
+            
+            $visibleParams[$id] = $def;
+?>
+            <div class="form-group row">
+                <label for="<?=$id?>" class="col-sm-2 form-control-label form-control-label-sm"><?=$def->label?></label>
+                <input type="<?=$def->type?>" class="col-sm-10 form-control form-control-sm" id="<?=$id?>" placeholder="<?=$def->placeholder?>" data-bind="value: data.<?=$id?>">
+            </div>
+<?php
+            }
+?>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" data-bind="click: submit, text: buttonLabel, disabled: progress, css: {disabled: progress}">OK</button>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+<script>
+    function  submit<?=$dialogJSVariable?> (model)
+        {
+        ajaxCall (model.baseUrl, model.<?=$dialogJSVariable?>.fn (), ko.toJS(model.<?=$dialogJSVariable?>.data),
+                  model.<?=$dialogJSVariable?>, model.<?=$dialogJSVariable?>.progress, model.<?=$dialogJSVariable?>.successCallback);
+        }
+    function  edit<?=$dialogJSVariable?> (model, title, action, buttonText, row, updateRow)
+        {
+        model.<?=$dialogJSVariable?>.dialogTitle (title);
+        model.<?=$dialogJSVariable?>.fn (action);
+        model.<?=$dialogJSVariable?>.buttonLabel (buttonText);
+        model.<?=$dialogJSVariable?>.successCallback = function (data)
+            {
+            $('#<?=$dialogId?>').modal('hide'); 
+            updateRow(data);
+            }
+        model.<?=$dialogJSVariable?>.data.id (ko.unwrap(row.id));
+        model.<?=$dialogJSVariable?>.errors ([]);
+<?php
+        foreach ($visibleParams as $id => $def)
+            {
+?>
+            model.<?=$dialogJSVariable?>.data.<?=$id?> (ko.unwrap(row.<?=$id?>));
+            model.<?=$dialogJSVariable?>.data.<?=\Chores\Model::PREFIX_OLD_ID?><?=$id?> = ko.unwrap(row.<?=$id?>);
+<?php
+            }
+?>
+        }
+    function  <?=$initFn?> (model)
+        {
+        model.<?=$dialogJSVariable?> =
+            {
+                data: { id : ko.observable(0) },
+                dialogTitle : ko.observable('Edit'),
+                buttonLabel : ko.observable('OK'),
+                submit : function () { submit<?=$dialogJSVariable?>(model); },
+                errors : ko.observableArray(),
+                progress : ko.observable(false),
+                fn: ko.observable('create'),
+            };
+<?php
+        foreach ($visibleParams as $id => $def)
+            {
+?>
+            model.<?=$dialogJSVariable?>.data.<?=$id?> = ko.observable();
+<?php
+            }
+?>
+        }
+</script>
+<?php
+        return (object)[ 'id' => $dialogJSVariable, 'initFn' => $initFn, 'editFn' => "edit{$dialogJSVariable}" ];
+        }
     }
