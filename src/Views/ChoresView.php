@@ -33,14 +33,26 @@ class ChoresView
         {
 ?>
     <table class="table table-hover">
+        <thead>
+            <tr>
+                <td width="50%">Label</td>
+                <td width="1%" colspan="3">Overdue</td>
+            </tr>
+        </thead>
         <tbody data-bind="foreach: selectedCategories">
             <tr>
                 <td>
                   <div class="btn btn-link" data-bind="text: label, click: navigateTo">
                   </div>
                 </td>
-                <td data-bind="text: pendingToday">
-
+                <td class="text-right">
+                    <span data-bind="text: pendingToday"></span>
+                </td>
+                <td class="text-center">
+                    of
+                </td>
+                <td>
+                    <span data-bind="text: tasks"></span>
                 </td>
             </tr>
         </tbody>
@@ -66,7 +78,7 @@ class ChoresView
                 <td data-bind="text: label">
 
                 </td>
-                <td data-bind="css: { success : diff() < -1, danger: diff() > 3, warning: diff() > 0}">
+                <td data-bind="css: { success : diff() < -1, danger: diff() > 3, warning: diff() > 0, info: diff()==0}">
                     <div data-bind="text: nextDate">
                     </div>
                     (<span data-bind="if: diff() > 0">overdue <span data-bind="text: diff"></span> days</span

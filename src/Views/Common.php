@@ -76,6 +76,17 @@ class Common
 <?php
         }
 
+    public static function writeBoundMessages (string $param = "messages", string $status = "info")
+        {
+?>
+    <div data-bind="foreach: <?=$param?>">
+        <div class="alert alert-<?=$status?>">
+            <strong>Error!</strong> <span data-bind="text:$data"></span>
+        </div>
+    </div>
+<?php
+        }
+
     public static function writeLoginForm (string $title, $error)
         {
 ?>

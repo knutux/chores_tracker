@@ -74,6 +74,181 @@ class Model
         $this->model->errors = $this->errors;
         }
 
+    public function importData (Database $db, string $fileName, bool $clearBeforeImport)
+        {
+        $this->model = (object)
+                [
+                    'version' => $db->getVersion(),
+                    'messages' => [],
+                    'errors' => []
+                ];
+
+        if (!file_exists($fileName))
+            $this->model->errors[] = "Invalid file specified";
+        else
+            $this->processImport ($db, $fileName, $clearBeforeImport, $this->model->messages, $this->model->errors);
+        
+        return $this->model;
+        }
+    
+    protected function processImport (Database $db, string $fileName, bool $clearBeforeImport, array &$messages, array &$errors) : bool
+        {
+        $file = fopen ($fileName, "r");
+        if (false == $file)
+            {
+            $errors[] = "Could not open the file";
+            return false;
+            }
+        
+        $messages[] = "Reading $fileName";
+        $contents = $this->readImportFile ($file, $errors);
+        fclose ($file);
+
+        if (false === $contents)
+            {
+            return false;
+            }
+
+        $cnt = count($contents);
+        $messages[] = "{$cnt} rows found";
+        
+        $existingCategories = $db->selectCategories($error);
+        if (false === $existingCategories)
+            {
+            $errors[] = $error;
+            return false;
+            }
+            
+        $cnt = count($existingCategories);
+        $messages[] = "$cnt categories found";
+        return $this->importRows ($db, $existingCategories, $contents, $messages, $errors);
+        }
+    
+    protected function importRows (Database $db, array $existingCategories, array $contents, array &$messages, array &$errors) : bool
+        {
+        foreach ($contents as $row)
+            {
+            // 'area', 'category', 'task', 'frequence', 'lastDate', 'nextDate', 'cost'
+            $categoryId = $this->findOrCreateCategory ($db, $existingCategories, $row->area, $row->category, $error);
+            if (false === $categoryId)
+                {
+                $errors[] = $error;
+                return false;
+                }
+            
+            list ($categoryId, $path) = $categoryId;
+            $taskId = $this->createTask($db, $categoryId, $path, $row->task, $row->frequency, $row->cost, $row->nextDate, $error);
+            if (false === $taskId)
+                {
+                $errors[] = $error;
+                return false;
+                }
+            }
+            
+        $errors[] = "N/I";
+        return false;
+        }
+    
+    protected function createTask (Database $db, int $categoryId, string $path = null,
+                                   string $label = null, int $frequency = null, int $cost = null,
+                                   string $nextDate = null, string &$error = null)
+        {
+        $cost = NULL === $cost ? 'NULL' : $cost;
+        $label = $db->escapeString ($label, true);
+        $path = "{$path}{$categoryId}_";
+        $sql = <<<EOT
+(`Label`, `Notes`, `Category Id`, `Permission Group`, `Next Date`, `Frequency`, `Cost`, `Path`)
+    VALUES
+($label, '-', $categoryId, 1, '$nextDate', $frequency, $cost, '$path')
+EOT;
+        return $db->executeInsert(Database::TABLE_CHORES, $sql, $error);
+        }
+    
+    protected function findCategory (array $existingCategories, string $category, int $parentId = null)
+        {
+        foreach ($existingCategories as $cat)
+            {
+            if ($cat['Parent Id'] == $parentId && 0 == strcasecmp($category, $cat['Label']))
+                return $cat['Id'];
+            }
+        
+        return false;
+        }
+    
+    protected function findOrCreateCategory (Database $db, array &$existingCategories, string $mainCategory, string $subCategory = null, string &$error = null)
+        {
+        $mainCategoryId = $this->findCategory ($existingCategories, $mainCategory, null);
+        if (false === $mainCategoryId)
+            {
+            $mainCategoryId = $this->createCategory ($db, $mainCategory, null, '', $error);
+            if (false === $mainCategoryId)
+                return false;
+            $existingCategories[] = ['Id' => $mainCategoryId, 'Label' => $mainCategory, 'Parent Id' => null, 'Path' => ''];
+            }
+        
+        if (empty ($subCategory))
+            return [$mainCategoryId, '_'];
+        
+        $path = "_$mainCategoryId";
+        $categoryId = $this->findCategory ($existingCategories, $subCategory, $mainCategoryId);
+        if (false === $categoryId)
+            {
+            $categoryId = $this->createCategory ($db, $subCategory, $mainCategoryId, $path, $error);
+            if (false === $categoryId)
+                return false;
+            $existingCategories[] = ['Id' => $categoryId, 'Label' => $subCategory, 'Parent Id' => $mainCategoryId, 'Path' => $path];
+            }
+            
+        return [$mainCategoryId, $path.'_'];
+        }
+    
+    protected function createCategory (Database $db, string $category, int $parentId = null, string $path = null, string &$error = null)
+        {
+        $parentId = NULL === $parentId ? 'NULL' : $parentId;
+        $category = $db->escapeString ($category, true);
+        $sql = <<<EOT
+(`Label`, `Notes`, `Priority`, `Path`, `Permission Group`, `Parent Id`)
+    VALUES
+($category, '-', 10, '$path', 1, $parentId)
+EOT;
+        return $db->executeInsert(Database::TABLE_CHORES_CATEGORY, $sql, $error);
+        }
+    
+    protected function readImportFile ($file, &$errors)
+        {
+        $header = false;
+        $rows = [];
+        while (($data = fgetcsv($file, 1000, ",")) !== FALSE)
+            {
+            if (false === $header)
+                {
+                $header = array_combine(array_values($data), array_keys($data));
+                if (!isset ($header['Area']) || !isset ($header['Task']) || !isset ($header['Frequence']) ||
+                    !isset ($header['Last Date']) || !isset ($header['Next Date']) || !isset ($header['Cost']))
+                    {
+                    $errors[] = "Invalid columns found in header";
+                    var_dump ($header);
+                    return false;
+                    }
+                continue;
+                }
+                
+            $row = (object)
+                    [
+                        'area' => $data[$header['Area']],
+                        'category' => empty ($header['Category']) ? null : $data[$header['Category']],
+                        'frequency' => $data[$header['Frequence']],
+                        'task' => $data[$header['Task']],
+                        'lastDate' => $data[$header['Last Date']],
+                        'nextDate' => $data[$header['Next Date']],
+                        'cost' => $data[$header['Cost']],
+                    ];
+            $rows[] = $row;
+            }
+        
+        return $rows;
+        }
+        
     protected function collectCategories (Database $db)
         {
         $categories = $db->selectCategoriesWithStats($error);
@@ -88,6 +263,7 @@ class Model
             $cat = new \stdClass();
             $cat->label = $row['Label'];
             $cat->pendingToday = $row['Pending'];
+            $cat->tasks = $row['Tasks'];
             $cat->id = $row['Id'];
             $cat->parentId = $row['Parent Id'] ?? 0;
             return $cat;

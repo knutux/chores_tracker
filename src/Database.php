@@ -95,6 +95,17 @@ EOT;
         return $rows;
         }
         
+    public function selectCategories(string &$error = null)
+        {
+        $tableName = self::TABLE_CHORES_CATEGORY;
+        $sql = <<<EOT
+SELECT cat.`Id`, cat.`Label`, cat.`Parent Id`
+ FROM `$tableName` cat
+EOT;
+        $rows = $this->executeSelect ($tableName, $sql, $error);
+        return $rows;
+        }
+        
     public function selectTasks(string &$error = null)
         {
         $tableName = self::TABLE_CHORES;

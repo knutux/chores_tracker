@@ -72,6 +72,12 @@ abstract class DatabaseCore
         return $tables;
         }
 
+    public function escapeString (string $str = null, bool $addQuotes = false) : string
+        {
+        $string = $this->db->escapeString ($str);
+        return $addQuotes ? "'$string'" : $string;
+        }
+
     public function encodePassword (string $user, string $password) : string
         {
         // use password_verify to verify
@@ -202,7 +208,7 @@ EOT;
         return true;
         }
 
-    protected function executeInsert (string $tableName, string $colsWithValues, &$error)
+    public function executeInsert (string $tableName, string $colsWithValues, &$error)
         {
         $sql = <<<EOT
 INSERT INTO `$tableName`
