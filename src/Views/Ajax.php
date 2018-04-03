@@ -22,4 +22,35 @@ class Ajax
         header('Content-Type: application/json');
         echo json_encode ((object)['errors' => [$err], 'success' => false, 'result' => null]);
         }
+        
+    public static function getBooleanParam (array $postArgs, string $name, bool $default = false) : bool
+        {
+        return ($postArgs[$name] ?? $default) == true;
+        }
+        
+    public static function getIntegerParam (array $postArgs, string $name, int $default = 0) : int
+        {
+        $val = $postArgs[$name] ?? null;
+        return is_numeric ($val) ? $val : $default;
+        }
+        
+    public static function handleMessage (\Chores\Database $db, \Chores\Model $model, array $postArgs = null)
+        {        
+        $message = $postArgs['fn'] ?? null;
+        
+        switch ($message)
+            {
+            case "done":
+                $id = self::getIntegerParam($postArgs, 'id');
+                $result = $model->markTaskDone ($db, $id, self::getBooleanParam($postArgs, 'today', true));
+                break;
+            default:
+                self::writeError("Unrecognized action ($message)", 500);
+                exit();
+            }
+        
+        header("HTTP/1.0 200 OK");
+        header('Content-Type: application/json');
+        echo json_encode ($result);
+        }
     }

@@ -83,7 +83,7 @@ class Database extends DatabaseCore
         $tableChores = self::TABLE_CHORES;
         $permissionFilter = $this->createPermissionFilter ('Permission Group');
         $sql = <<<EOT
-SELECT cat.`Id`, cat.`Label`, cat.`Parent Id`,
+SELECT cat.`Id`, cat.`Label`, (CASE WHEN cat.`Parent Id` IS NULL THEN 0 ELSE cat.`Parent Id` END) `Parent Id`,
        COUNT(ch.`Id`) `Tasks`, COUNT(CASE WHEN ch.`Next Date` <= DATE('now') THEN 1 ELSE NULL END) `Pending`
  FROM `$tableName` cat
  LEFT OUTER JOIN `$tableChores` ch ON ch.`Path` LIKE cat.`Path` || '_' || cat.`Id` || '_%'
@@ -99,28 +99,45 @@ EOT;
         {
         $tableName = self::TABLE_CHORES_CATEGORY;
         $sql = <<<EOT
-SELECT cat.`Id`, cat.`Label`, cat.`Parent Id`
+SELECT cat.`Id`, cat.`Label`, (CASE WHEN cat.`Parent Id` IS NULL THEN 0 ELSE cat.`Parent Id` END) `Parent Id`
  FROM `$tableName` cat
 EOT;
         $rows = $this->executeSelect ($tableName, $sql, $error);
         return $rows;
         }
         
-    public function selectTasks(string &$error = null)
+    public function selectTasksWhere(string $where = null, string &$error = null)
         {
         $tableName = self::TABLE_CHORES;
         $tableCompleted = self::TABLE_CHORES_COMPLETED;
         $permissionFilter = $this->createPermissionFilter ('Permission Group');
+        $where = empty ($where) ? "" : "($where) AND ";
         $sql = <<<EOT
 SELECT ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`,
        MAX(lt.`Date`) `Last Date`
  FROM `$tableName` ch
  LEFT OUTER JOIN `$tableCompleted` lt ON lt.`Chores Id` = ch.`Id`
-WHERE $permissionFilter
+WHERE $where $permissionFilter
 GROUP BY ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`
 ORDER BY (ch.`Next Date`-DATE('now')) * ch.`Frequency` ASC
 EOT;
         $rows = $this->executeSelect ($tableName, $sql, $error);
         return $rows;
+        }
+
+    public function selectTasks(string &$error = null)
+        {
+        return $this->selectTasksWhere(null, $error);
+        }
+
+    public function selectSingleTasks(int $id, string &$error = null)
+        {
+        $rows = $this->selectTasksWhere("ch.`Id`=$id", $error);
+        if (empty ($rows))
+            {
+            $error = $error ?? "Not found";
+            return false;
+            }
+        return $rows[0];
         }
     }

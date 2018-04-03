@@ -21,6 +21,7 @@ class ChoresView
 <div class="content-fluid">
     <?= Common::writeBoundErrors()?>
     <div data-bind="if:'category'==mode()">
+    <?=self::writeTabsHeader($model)?>
     <?=self::writeCategories($model)?>
     <?=self::writeTasks($model)?>
     </div>
@@ -32,6 +33,7 @@ class ChoresView
     public static function writeCategories (\Chores\Model $model)
         {
 ?>
+    <div data-bind="if: 'categories'==selectedTab()">
     <table class="table table-hover">
         <thead>
             <tr>
@@ -57,12 +59,37 @@ class ChoresView
             </tr>
         </tbody>
     </table>
+    </div>
+<?php
+        }
+
+    public static function writeTabsHeader (\Chores\Model $model)
+        {
+?>
+    <div data-bind="if: selectedCategory() != 0" class="clearfix">
+        <div class="pull-right"><button class="btn btn-light" data-bind="click: function () { selectedCategory(0); selectedTab('categories'); }">Top Categories</button></div>
+    </div>
+    <ul class="nav nav-tabs">
+      <li data-bind="css: { active: 'categories'==selectedTab() }, click: function () { selectedTab('categories'); }" class="nav-link">
+          <a href="#">
+              <i class="fa fa-tags"></i>
+              Subcategories
+              (<span data-bind="text: selectedCategories().length"></span>)</a>
+      </li>
+      <li data-bind="css: { active: 'tasks'==selectedTab() }, click: function () { selectedTab('tasks'); }" class="nav-link">
+          <a href="#">
+              <i class="fa fa-th-list"></i>
+              Tasks
+              (<span data-bind="text: selectedTasks().length"></span>)</a>
+      </li>
+    </ul>
 <?php
         }
 
     public static function writeTasks (\Chores\Model $model)
         {
 ?>
+    <div data-bind="if: 'tasks'==selectedTab()">
     <table class="table table-hover table-bordered">
         <thead>
             <tr>
@@ -78,29 +105,55 @@ class ChoresView
                 <td data-bind="text: label">
 
                 </td>
-                <td data-bind="css: { success : diff() < -1, danger: diff() > 3, warning: diff() > 0, info: diff()==0}">
+                <td data-bind="css: { 'bg-success' : diff() < -1, 'bg-danger': diff() > 3, 'bg-warning': diff() > 0, 'bg-info': diff()==0}"  class="text-center">
                     <div data-bind="text: nextDate">
                     </div>
                     (<span data-bind="if: diff() > 0">overdue <span data-bind="text: diff"></span> days</span
-                    ><span data-bind="if: diff() < 0">due in <span data-bind="text: diff"></span> days</span>)
+                    ><span data-bind="if: diff() < 0">due in <span data-bind="text: diff"></span> days</span
+                    ><span data-bind="if: diff() == 0">due today</span>)
                 </td>
-                <td>
+                <td class="text-right">
                     every <span data-bind="text: frequency"></span> day(s)
                 </td>
-                <td>
-                    <span data-bind="text: cost"></span>
+                <td class="text-right">
+                    <div data-bind="if: cost() > 0"><span data-bind="text: cost"></span> min.</div>
+                    <div data-bind="if: cost() == 0" class="text-muted">N/A</div>
                 </td>
-                <td>
-                    Edit / Mark
+                <td class="btn-group" role="group" aria-label="Actions">
+                    <button role="button" data-bind="click:markDone" class="btn btn-success">
+                        <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
+                        <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
+                        Done
+                    </button>
+                    <div class="btn-group" role="group">
+                        <button id="btnGroupDrop1" type="button" class="btn btn-light dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                          <span data-bind="ifnot:executing"><i class="fa fa-ellipsis-h"></i></span></span>
+                          <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="btnGroupDrop1">
+                          <a class="dropdown-item" href="#">
+                              <span data-bind="ifnot:executing"><i class="fa fa-pencil"></i></span></span>
+                              <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
+                              Edit
+                          </a>
+                          <a class="dropdown-item" href="#" data-bind="click:markDoneYesterday">
+                              <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
+                              <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
+                              yesterday
+                          </a>
+                        </div>
+                    </div>
                 </td>
             </tr>
         </tbody>
     </table>
+    </div>
 <?php
         }
 
     public static function writeScripts (\Chores\Model $model)
         {
+        Common::writeCommonScripts();
 ?>
 <script>
     function cacheHierarchy (model)
@@ -128,7 +181,10 @@ class ChoresView
         }
     function isInHierarchy (model, categoryId)
         {
-        var flatCategories = model.hierarchyCache[model.selectedCategory()];
+        var sel = model.selectedCategory();
+        if (!(sel in model.hierarchyCache))
+            return false;
+        var flatCategories = model.hierarchyCache[sel];
         return -1 !== flatCategories.indexOf (categoryId);
         }
     function adjustCategory (model, row)
@@ -136,6 +192,34 @@ class ChoresView
         row.navigateTo = function ()
             {
             model.selectedCategory(row.id());
+            if (0 == row.id())
+                model.selectedTab('categories');
+            else
+                model.selectedTab('tasks');
+            }
+        }
+    function adjustTask (model, row)
+        {
+        row.executing = ko.observable(false);
+        var updateRow = function (newData)
+            {
+            var newRow = newData.row;
+            for (var i = 0; i < newData.props.length; i++)
+                {
+                var prop = newData.props[i];
+                row[prop](newRow[prop]);
+                }
+            } 
+        row.edit = function ()
+            {
+            }
+        row.markDone = function ()
+            {
+            ajaxCall(model.baseUrl, 'done', { id: row.id(), today: 1 }, model, row.executing, updateRow);
+            }
+        row.markDoneYesterday = function ()
+            {
+            ajaxCall(model.baseUrl, 'done', { id: row.id(), today: 0 }, model, row.executing, updateRow);
             }
         }
     function adjustCategories (model)
@@ -144,6 +228,14 @@ class ChoresView
             {
             var row = model.categories()[i];
             adjustCategory (model, row);
+            }
+        }
+    function adjustTasks (model)
+        {
+        for (var i = 0; i < model.tasks().length; i++)
+            {
+            var row = model.tasks()[i];
+            adjustTask (model, row);
             }
         }
     function initializeModel($model)
@@ -158,7 +250,9 @@ class ChoresView
             return $.grep ($model.tasks(), function (el) { return isInHierarchy($model, ko.unwrap(ko.unwrap(el).categoryId)); });
             });
         adjustCategories($model);
+        adjustTasks($model);
         $model.selectedCategory.extend({ urlSync: "s_c" });
+        $model.selectedTab = ko.observable('categories').extend({ urlSync: "t_b" });
         }
 </script>
 <?php

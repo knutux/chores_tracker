@@ -29,10 +29,11 @@ class Common
     <!--meta name="viewport" content="width=device-width, initial-scale=1"-->
     <META NAME="Description" CONTENT="<?=$description?>">
     <META NAME="Author" CONTENT="knutux@gmail.com">
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <!--link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"-->
+    <link href="https://maxcdn.bootstrapcdn.com/bootswatch/4.0.0/litera/bootstrap.min.css" rel="stylesheet" integrity="sha384-MmFGSHKWNFDZYlwAtfeY6ThYRrYajzX+v7G4KVORjlWAG0nLhv0ULnFETyWGeQiU" crossorigin="anonymous">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.bundle.min.js" integrity="sha384-feJI7QwhOS+hwpX2zkaeJQjeiwlhOP+SdQDqhgvvo1DsjtiSQByFdThsxO669S2D" crossorigin="anonymous"></script>
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.5/lodash.min.js"></script>
@@ -135,6 +136,46 @@ class Common
             $('body').html (err.toString());
             }
     });
+</script>
+<?php
+        }
+
+    public static function writeCommonScripts ()
+        {
+?>
+<script>
+    function ajaxCall (baseUrl, fn, data, model, progress, successCallback)
+        {
+        data['fn'] = fn;
+        
+        model.errors.removeAll();
+        progress(true);
+        $.ajax(
+            {
+            type: "POST",
+            url: ko.unwrap (baseUrl),
+            data: data,
+            success: function (data, textStatus, jqXHR)
+                {
+                progress(false);
+                if (data.errors && data.errors.length)
+                    {
+                    model.errors (data.errors);
+                    }
+                else if (data.success)
+                    {
+                    successCallback (data);
+                    }
+                else
+                    model.errors ([jQuery(data).text()]);
+                },
+            error:  function (jqXHR, textStatus, errorThrown)
+                {
+                progress(false);
+                model.errors.push ("Error - " + errorThrown);
+                },
+            });
+        }
 </script>
 <?php
         }

@@ -17,6 +17,8 @@ class Model
     {
     private $model = false;
     private $errors = [];
+    
+    const SESSION_VERSION = 2;
 
     public function isLoggedIn (Database $db, $postData, &$error = null)
         {
@@ -30,10 +32,11 @@ class Model
         if (empty ($postData[\Chores\Views\Common::FIELD_USERNAME]) || empty ($postData[\Chores\Views\Common::FIELD_PASSWORD]))
             return false;
 
-        if ($db->checkPassword ($postData[\Chores\Views\Common::FIELD_USERNAME], $postData[\Chores\Views\Common::FIELD_PASSWORD]))
+        if ($db->checkPassword ($postData[\Chores\Views\Common::FIELD_USERNAME], $postData[\Chores\Views\Common::FIELD_PASSWORD], $id))
             {
             session_start();
-            $_SESSION["auth_user"] = TRUE;
+            $_SESSION["auth_version"] = self::SESSION_VERSION;
+            $_SESSION["auth_id"] = $id;
             session_commit();
             header('Location: index.php');
             exit();
@@ -42,10 +45,15 @@ class Model
         return false;
         }
 
+    public function getUserId (\Chores\Database $db) : ?int
+        {
+        return $_SESSION["auth_id"] ?? null;
+        }
+
     public function checkUserAuth ()
         {
         session_start();
-        if( isset($_SESSION["auth_user"]) && $_SESSION["auth_user"] === TRUE )
+        if( isset($_SESSION["auth_version"]) && $_SESSION["auth_version"] === self::SESSION_VERSION )
             {
             return TRUE;
             }
@@ -61,27 +69,155 @@ class Model
         return json_encode ($this->model);
         }
 
-    public function prepare (Database $db)
+    protected function createModelObject (Database $db)
         {
-        $this->model = (object)
+        return (object)
                 [
                     'version' => $db->getVersion(),
-                    'mode' => 'category',
-                    'categories' => $this->collectCategories($db),
-                    'tasks' => $this->collectTasks($db),
-                    'selectedCategory' => 0
+                    'errors' => [],
+                    'baseUrl' => 'ajax.php'
                 ];
+        }
+
+    protected function getCategoryPropertyMap ()
+        {
+        return ['label' => 'Label', 'pendingToday' => 'Pending',
+                'tasks' => 'Tasks', 'id' => 'Id', 'parentId' => 'Parent Id'];
+        }
+        
+    protected function getTaskPropertyMap ()
+        {
+        return ['label' => 'Label', 'categoryId' => 'Category Id', 'notes' => 'Notes',
+                'frequency' => 'Frequency', 'nextDate' => 'Next Date', 'cost' => 'Cost',
+                'id' => 'Id', 'lastDate' => 'Last Date',
+                'diff' => function ($row)
+                    {
+                    return round((strtotime(date('Y-m-d')) - strtotime($row['Next Date'])) / (24 * 60 * 60));
+                    }
+               ];
+        }
+        
+    public function prepare (Database $db)
+        {
+        $this->model = $this->createModelObject ($db);
+        $this->model->mode = 'category';
+        $this->model->categories = $this->collectCategories($db);
+        $this->model->tasks = $this->collectTasks($db);
+        $this->model->selectedCategory = 0;
         $this->model->errors = $this->errors;
         }
 
+    private function getTaskForUpdate (Database $db, int $id, string $today, string &$error = null)
+        {
+        $tableName = Database::TABLE_CHORES;
+        $tableCompleted = Database::TABLE_CHORES_COMPLETED;
+        $sql = <<<EOT
+SELECT `Frequency`, `Next Date`, `Date` `Last Date`
+  FROM `$tableName` c
+  LEFT OUTER JOIN `$tableCompleted` o ON c.`Id`=o.`Chores Id` AND `Date` = '$today'
+  WHERE c.`Id`=$id
+EOT;
+        $ret = $db->executeSelect ($tableName, $sql, $error);
+        if (empty ($ret))
+            {
+            $error = false === $ret ? $error : "Object not found - $id";
+            return false;
+            }
+
+        $nextDate = $this->calculateNextDate ($db, $id, $today, $ret[0]['Frequency'], $error);
+        if (null === $nextDate)
+            return false;
+        
+        $ret[0]['New Next Date'] = $nextDate;
+        if ($ret[0]['Next Date'] == $ret[0]['New Next Date'] && $today == $ret[0]['Last Date'])
+            {
+            $error = "Nothing to update - same date is already recorded";
+            return false;
+            }
+            
+        return $ret[0];
+        }
+
+    private function calculateNextDate (Database $db, int $id, string $today, int $frequency, string &$error = null) : ?string
+        {
+        // TODO: take the schedule into account
+        if ($frequency <= 0)
+            $frequency = 1;
+        
+        return date('Y-m-d', strtotime ("+ $frequency day", strtotime ($today)));
+        }
+
+    private function updateTaskCompletedDate (Database $db, int $id, string $today, array $row, string &$error = null) : bool
+        {
+        $nextDate = $row['New Next Date'];
+        $recordedNextDate = $row['Next Date'];
+        if ($recordedNextDate != $nextDate)
+            {
+            $tableName = Database::TABLE_CHORES;
+            $sql = "SET `Next Date`='$nextDate' WHERE `Id`=$id";
+            if (false === $db->executeUpdate ($tableName, $sql, $error))
+                return false;
+            }
+
+        $recordedLastDate = $row['Last Date'];
+        if ($today != $recordedLastDate)
+            {
+            $tableName = Database::TABLE_CHORES_COMPLETED;
+            $userId = $this->getUserId ($db);
+            $sql = "(`Chores Id`, `Date`, `User Id`) VALUEs ($id, '$today', $userId)";
+            if (false === $db->executeInsert ($tableName, $sql, $error))
+                return false;
+            }
+            
+        return true;
+        }
+
+    public function markTaskDone (Database $db, int $id = null, bool $markToday = null) : \stdClass
+        {
+        $model = $this->createModelObject ($db);
+        $model->success = false;
+        if (!is_numeric($id) || $id <= 0)
+            {
+            $model->errors[] = "Invalid id - $id";
+            return $model;
+            }
+            
+        $today = date('Y-m-d', $markToday ? time() : strtotime('-1 day'));
+        $row = $this->getTaskForUpdate($db, $id, $today, $error);
+        if (false === $row || false === $this->updateTaskCompletedDate($db, $id, $today, $row, $error))
+            {
+            $model->errors[] = $error;
+            return $model;
+            }
+                    
+        $row = $db->selectSingleTasks ($id, $error);
+        if (false === $row)
+            {
+            $model->errors[] = $error;
+            return $model;
+            }
+        
+        $props = $this->getTaskPropertyMap ();
+        $model->props = array_keys($props);
+
+        $instance = new \stdClass();
+        foreach ($props as $modelProp => $dbProp)
+            {
+            if (is_callable($dbProp))
+                $instance->{$modelProp} = $dbProp($row);
+            else
+                $instance->{$modelProp} = $row[$dbProp];
+            }
+
+        $model->row = $instance;
+        $model->success = true;
+        return $model;
+        }
+        
     public function importData (Database $db, string $fileName, bool $clearBeforeImport)
         {
-        $this->model = (object)
-                [
-                    'version' => $db->getVersion(),
-                    'messages' => [],
-                    'errors' => []
-                ];
+        $this->model = $this->createModelObject ($db);
+        $this->model->messages = [];
 
         if (!file_exists($fileName))
             $this->model->errors[] = "Invalid file specified";
@@ -237,7 +373,7 @@ EOT;
                     [
                         'area' => $data[$header['Area']],
                         'category' => empty ($header['Category']) ? null : $data[$header['Category']],
-                        'frequency' => $data[$header['Frequence']],
+                        'frequency' => max(round($data[$header['Frequence']]), 1),
                         'task' => $data[$header['Task']],
                         'lastDate' => $data[$header['Last Date']],
                         'nextDate' => $data[$header['Next Date']],
@@ -249,25 +385,35 @@ EOT;
         return $rows;
         }
         
+    protected function mapDBPropertiesToModel (array $rows = null, array $props = null) : array
+        {
+        //var_dump ($rows, $props);
+        return array_map(function ($row) use ($props)
+            {
+            $cat = new \stdClass();
+            
+            foreach ($props as $modelProp => $dbProp)
+                {
+                if (is_callable($dbProp))
+                    $cat->{$modelProp} = $dbProp($row);
+                else
+                    $cat->{$modelProp} = $row[$dbProp];
+                }
+            return $cat;
+            }, $rows ?? []);
+        }
+        
     protected function collectCategories (Database $db)
         {
         $categories = $db->selectCategoriesWithStats($error);
+        //var_dump ($categories, $error);
         if (false === $categories)
             {
             $this->errors[] = $error;
             return [];
             }
 
-        return array_map(function ($row)
-            {
-            $cat = new \stdClass();
-            $cat->label = $row['Label'];
-            $cat->pendingToday = $row['Pending'];
-            $cat->tasks = $row['Tasks'];
-            $cat->id = $row['Id'];
-            $cat->parentId = $row['Parent Id'] ?? 0;
-            return $cat;
-            }, $categories ?? []);
+        return $this->mapDBPropertiesToModel ($categories, $this->getCategoryPropertyMap ());
         }
         
     protected function collectTasks (Database $db)
@@ -279,19 +425,6 @@ EOT;
             return [];
             }
 
-        return array_map(function ($row)
-            {
-            $cat = new \stdClass();
-            $cat->categoryId = $row['Category Id'];
-            $cat->label = $row['Label'];
-            $cat->notes = $row['Notes'];
-            $cat->id = $row['Id'];
-            $cat->frequency = $row['Frequency'];
-            $cat->nextDate = $row['Next Date'];
-            $cat->diff = round((strtotime(date('Y-m-d')) - strtotime($row['Next Date'])) / (24 * 60 * 60));
-            $cat->cost = $row['Cost'];
-            $cat->lastDate = $row['Last Date'];
-            return $cat;
-            }, $rows ?? []);
+        return $this->mapDBPropertiesToModel ($rows, $this->getTaskPropertyMap ());
         }
     }

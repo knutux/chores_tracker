@@ -84,11 +84,15 @@ abstract class DatabaseCore
         return password_hash ($password, PASSWORD_DEFAULT);
         }
 
-    public function checkPassword (string $user, string $password) : bool
+    public function checkPassword (string $user, string $password, int &$id = null) : bool
         {
         $tableName = self::TABLE_USER;
         $user = $this->db->escapeString ($user);
-        $hash = $this->executeSelectSingle ($tableName, "SELECT `Password` FROM `$tableName` WHERE (`Account Name`='$user' OR `Email` LIKE '$user') AND `State` > 0", $error);
+        $rows = $this->executeSelect ($tableName, "SELECT `Password`, `Id` FROM `$tableName` WHERE (`Account Name`='$user' OR `Email` LIKE '$user') AND `State` > 0", $error);
+        if (empty ($rows))
+            return false;
+        $hash = $rows[0]['Password'];
+        $id = $rows[0]['Id'];
         return password_verify ($password, $hash);
         }
 
@@ -210,6 +214,7 @@ EOT;
 
     public function executeInsert (string $tableName, string $colsWithValues, &$error)
         {
+        // TODO: implement permission check
         $sql = <<<EOT
 INSERT INTO `$tableName`
 $colsWithValues
@@ -221,6 +226,16 @@ EOT;
         return $this->db->lastInsertRowID ();
         }
 
+    public function executeUpdate ($tableName, $setAndWhere, $accessAlreadyChecked = false)
+        {
+        $permissionFilter = $accessAlreadyChecked ? "1=1" : $this->createPermissionFilter ('Permission Group');
+        $sql = "UPDATE `$tableName` $setAndWhere AND $permissionFilter";
+        $success = @$this->db->exec($sql);
+        if (!$this->checkExecutionError ($success, $sql, $error))
+            return false;
+        return true;
+        }
+        
     protected function executeSelectSingle (string $tableName, string $sql, string &$error = null)
         {
         $ret = @$this->db->querySingle($sql);
@@ -230,7 +245,7 @@ EOT;
         return $ret;
         }
 
-    protected function executeSelect (string $tableName, string $sql, string &$error = null)
+    public function executeSelect (string $tableName, string $sql, string &$error = null)
         {
         $ret = @$this->db->query($sql);
         if (!$this->checkExecutionError (false !== $ret, $sql, $error))
