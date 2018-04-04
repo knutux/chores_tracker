@@ -164,7 +164,7 @@ class ChoresView
             var parentId = this[key];
             while (0 !== parentId)
                 {
-                model.hierarchyCache[parentId].push (key);
+                model.hierarchyCache[parentId].push (parseInt(key));
                 parentId = this[parentId];
                 }
             }, parents);
@@ -188,7 +188,7 @@ class ChoresView
             var ret = $.grep (model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == row.id(); });
             return ret;
             });
-        row.isExpanded = ko.observable(true);
+        row.isExpanded = ko.observable(model.selectedCategory() == row.id());
         row.toggle = function ()
             {
             if (row.subcategories().length)
@@ -245,7 +245,16 @@ class ChoresView
             });
         $model.selectedTasks = ko.computed (function ()
             {
-            var filter = function (el) { return isInHierarchy($model, ko.unwrap(ko.unwrap(el).categoryId)); };
+            var filter = function (el)
+                {
+                var cat = ko.unwrap(ko.unwrap(el).categoryId);
+                if ($model.selectedCategory() == cat)
+                    return true;
+                if (el.diff() < 0)
+                    return false;
+                var inHierarchy = 0 == $model.selectedCategory() || isInHierarchy($model, cat);
+                return inHierarchy;
+                }
             return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
         adjustCategories($model);
