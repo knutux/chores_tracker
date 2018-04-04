@@ -250,7 +250,7 @@ class ChoresView
                 var cat = ko.unwrap(ko.unwrap(el).categoryId);
                 if ($model.selectedCategory() == cat)
                     return true;
-                if (el.diff() < 0)
+                if (el.diff() < -1)
                     return false;
                 var inHierarchy = 0 == $model.selectedCategory() || isInHierarchy($model, cat);
                 return inHierarchy;

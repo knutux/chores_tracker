@@ -170,9 +170,15 @@ class Model
                 continue;
             
             $val = $db->escapeString($postArgs[$newValueId], true);
-            $oldVal = $db->escapeString($postArgs[$oldValueId], true);
             $updateValues[] = "`{$prop->dbName}`=$val";
-            $whereOld[] = "`{$prop->dbName}`=$oldVal";
+            
+            if (empty ($postArgs[$oldValueId]))
+                $whereOld[] = "(`{$prop->dbName}` IS NULL OR `{$prop->dbName}`='')";
+            else
+                {
+                $oldVal = $db->escapeString($postArgs[$oldValueId], true);
+                $whereOld[] = "`{$prop->dbName}`=$oldVal";
+                }
             }
             
         if (empty ($updateValues))
