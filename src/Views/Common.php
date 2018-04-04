@@ -258,6 +258,7 @@ class Common
 <?php
             }
 ?>
+        $('#<?=$dialogId?>').modal('show');
         }
     function  <?=$initFn?> (model)
         {

@@ -42,13 +42,26 @@ class ChoresView
     public static function writeCategories (\Chores\Model $model)
         {
 ?>
-    <ul class="list-group" data-bind="template: { name: 'category-tree', data: { list: topLevelCategories, root: $data, indent: 0 } }" />
+    <div class="btn-group btn-group-sm d-flex justify-content-center" role="group" aria-label="Category actions">
+        <button role="button" disabled class="btn btn-secondary"><i class="fa fa-plus"></i> Add new</button>
+        <button role="button" data-bind="attr: { disabled: selectedCategory() == 0 }, click: function () { selectedCategory(0); }" class="btn btn-secondary"><i class="fa fa-home"></i> Home</button>
+    </div>
+    <hr/>
+    <ul class="list-group" data-bind="template: { name: 'category-tree', data: { list: topLevelCategories, root: $data, indent: 0 } }" ></ul>
+    
 <?php
         }
 
     public static function writeTasks (\Chores\Model $model)
         {
 ?>
+    <div class="clearfix">
+      <div class="btn-group btn-group-sm d-flex justify-content-end float-right" role="group" aria-label="Task actions">
+        <input type="text" class="form-control form-control-sm" id="search-input" placeholder="Search..." data-bind="value: textFilter">
+        <button role="button" data-bind="attr: { disabled: selectedCategory() == 0 }, click: createTask" class="btn btn-secondary"><i class="fa fa-plus"></i> Add new</button>
+      </div>
+    </div>
+    <hr/>
     <table class="table table-hover table-bordered">
         <thead>
             <tr>
@@ -64,11 +77,12 @@ class ChoresView
                 <td data-bind="text: label">
 
                 </td>
-                <td data-bind="css: { 'bg-success' : diff() < -1, 'bg-danger': diff() > 3, 'bg-warning': diff() > 0, 'bg-info': diff()==0}"  class="text-center">
+                <td data-bind="css: { 'bg-success' : diff() < -1, 'bg-danger': diff() > 3, 'bg-warning': diff() > 0, 'bg-secondary': diff()==0, 'bg-info': diff()==-1}"  class="text-center">
                     <div data-bind="text: nextDate">
                     </div>
                     (<span data-bind="if: diff() > 0">overdue <span data-bind="text: diff"></span> days</span
-                    ><span data-bind="if: diff() < 0">due in <span data-bind="text: diff"></span> days</span
+                    ><span data-bind="if: diff() < -1">due in <span data-bind="text: Math.abs(diff())"></span> days</span
+                    ><span data-bind="if: diff() == -1">due tomorrow</span
                     ><span data-bind="if: diff() == 0">due today</span>)
                 </td>
                 <td class="text-right">
@@ -239,6 +253,21 @@ class ChoresView
     function initializeModel($model)
         {
         cacheHierarchy($model);
+        $model.textFilter = ko.observable("");
+        var addTask = function (newData)
+            {
+            var newRow = ko.mapping.fromJS(newData.row);
+            adjustTask ($model, newRow);
+            $model.tasks().push (newRow)
+            };
+
+        $model.createTask = function ()
+            {
+            if ($model.selectedCategory() == 0)
+                return;
+            
+            <?=$initTasksDialog->editFn?>($model, 'Add new task', 'create:task', 'Create', { id: $model.selectedCategory() }, addTask);
+            };
         $model.selectedCategories = ko.computed (function ()
             {
             return $.grep ($model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == $model.selectedCategory(); });
@@ -250,10 +279,15 @@ class ChoresView
                 var cat = ko.unwrap(ko.unwrap(el).categoryId);
                 if ($model.selectedCategory() == cat)
                     return true;
-                if (el.diff() < -1)
+                if ($model.textFilter().length == 0 && el.diff() < -1)
                     return false;
                 var inHierarchy = 0 == $model.selectedCategory() || isInHierarchy($model, cat);
-                return inHierarchy;
+                if (!inHierarchy)
+                    return false;
+                var label = el.label();
+                if (null === label)
+                    return false;
+                return label.toLowerCase().indexOf ($model.textFilter().toLowerCase()) != -1;
                 }
             return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });

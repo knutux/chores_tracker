@@ -136,24 +136,97 @@ class Model
             ];
         }
         
-    public function editInstance (Database $db, string $type, int $id, array $postArgs) : \stdClass
+    private function recognizeClassForAction (string $type, string &$tableName = null, array &$props = null, bool &$requiresParent = null, string &$parentColumn = null) : bool
         {
-        $model = $this->createModelObject ($db);
-        $model->success = false;
         $tableName = false;
         $props = false;
+        $requiresParent = false;
         
         switch ($type)
             {
             case 'task':
                 $tableName = \Chores\Database::TABLE_CHORES;
                 $props = self::getTaskPropertyMap();
+                $requiresParent = true;
+                $parentColumn = "Category Id";
                 break;
             default:
                 break;
             }
         
-        if (!is_numeric($id) || $id <= 0 || empty ($tableName))
+        return !empty ($tableName);  
+        }
+        
+    public function createInstance (Database $db, string $type, int $parentId = null, array $postArgs) : \stdClass
+        {
+        $model = $this->createModelObject ($db);
+        $model->success = false;
+        $recognized = $this->recognizeClassForAction ($type, $tableName, $props, $requiresParent, $parentColumn);
+        
+        if (($requiresParent && (!is_numeric($parentId) || $parentId <= 0)) || !$recognized)
+            {
+            $model->errors[] = "Invalid arguments - ($type/$parentId)";
+            return $model;
+            }
+            
+        $cols = $vals = [];
+        if ($parentColumn && !empty ($parentId))
+            {
+            $cols[] = "`$parentColumn`";
+            $vals[] = $parentId;
+            }
+        foreach ($props as $propId => $prop)
+            {
+            if ($prop->readonly)
+                continue;
+            
+            if (!isset($postArgs[$propId]))
+                continue;
+            
+            $val = $db->escapeString($postArgs[$propId], true);
+            $cols[] = "`{$prop->dbName}`";
+            $vals[] = "$val";
+            }
+            
+        $cols = implode (", ", $cols);
+        $vals = implode (", ", $vals);
+        $sql = "($cols) VALUES ($vals)";
+        $id = $db->executeInsert ($tableName, $sql, $error);
+
+        if (false === $id)
+            return $model;
+        
+        switch ($type)
+            {
+            case 'task':
+                $row = $db->selectSingleTasks ($id, $error);
+                break;
+            default:
+                $model->errors[] = "This object type is not fully supported - updated successfully, but cannot refresh the view";
+                return $model;
+            }
+            
+        if (false === $row)
+            {
+            $model->errors[] = $error;
+            return $model;
+            }
+        
+        $model->props = array_keys($props);
+        $instance = $this->mapDBPropertiesToModelSingle ($row, $props);
+
+        $model->row = $instance;
+        $model->success = true;
+        return $model;
+        }
+        
+    public function editInstance (Database $db, string $type, int $id, array $postArgs) : \stdClass
+        {
+        $model = $this->createModelObject ($db);
+        $model->success = false;
+        $recognized = $this->recognizeClassForAction ($type, $tableName, $props);
+        
+        if (!is_numeric($id) || $id <= 0 || !$recognized)
             {
             $model->errors[] = "Invalid arguments - ($type/$id)";
             return $model;

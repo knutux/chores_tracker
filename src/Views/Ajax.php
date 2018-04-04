@@ -55,6 +55,11 @@ class Ajax
                 $id = self::getIntegerParam($postArgs, 'id');
                 $result = $model->editInstance ($db, $type, $id, $postArgs);
                 break;
+            case "create":
+                $type = $message[1] ?? '??';
+                $parentId = self::getIntegerParam($postArgs, 'id');
+                $result = $model->createInstance ($db, $type, $parentId, $postArgs);
+                break;
             default:
                 self::writeError("Unrecognized action ($message[0]])", 500);
                 exit();
