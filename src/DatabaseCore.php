@@ -212,6 +212,15 @@ EOT;
         return true;
         }
 
+    protected function executeTruncateTable (string $tableName, string &$error = null) : bool
+        {
+        $success = @$this->db->exec("DELETE FROM `$tableName`");
+        if (!$this->checkExecutionError ($success, "TRUNCATE $tableName", $error))
+            return false;
+
+        return true;
+        }
+
     public function executeInsert (string $tableName, string $colsWithValues, &$error)
         {
         // TODO: implement permission check

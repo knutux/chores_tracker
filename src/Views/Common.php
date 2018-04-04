@@ -38,6 +38,8 @@ class Common
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.5/lodash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/URI.js/1.19.1/URI.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-treeview/1.2.0/bootstrap-treeview.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-treeview/1.2.0/bootstrap-treeview.min.js"></script>
     <script src="js/URI.fragmentQuery.js"></script>
     <script src="js/ko.extenders.urlSync.js"></script>
 </HEAD>
@@ -84,7 +86,7 @@ class Common
 ?>
     <div data-bind="foreach: <?=$param?>">
         <div class="alert alert-<?=$status?>">
-            <strong>Error!</strong> <span data-bind="text:$data"></span>
+            <span data-bind="text:$data"></span>
         </div>
     </div>
 <?php

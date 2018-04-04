@@ -23,12 +23,18 @@ class ChoresView
 <div class="content-fluid">
     <?= Common::writeBoundErrors()?>
     <div data-bind="if:'category'==mode()">
-    <?=self::writeTabsHeader($model)?>
-    <?=self::writeCategories($model)?>
-    <?=self::writeTasks($model)?>
+        <div id="categories-with-tasks" class="row">
+            <div class="col-sm-3 col-md-2">
+                <?=self::writeCategories($model)?>
+            </div>
+            <div class="col-sm-9 col-md-10">
+                <?=self::writeTasks($model)?>
+            </div>
+        </div>
     </div>
 </div>
 <?=self::writeScripts($model)?>
+<?=self::writeTemplates($model)?>
 
 <?php
         }
@@ -36,63 +42,13 @@ class ChoresView
     public static function writeCategories (\Chores\Model $model)
         {
 ?>
-    <div data-bind="if: 'categories'==selectedTab()">
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                <td width="50%">Label</td>
-                <td width="1%" colspan="3">Overdue</td>
-            </tr>
-        </thead>
-        <tbody data-bind="foreach: selectedCategories">
-            <tr>
-                <td>
-                  <div class="btn btn-link" data-bind="text: label, click: navigateTo">
-                  </div>
-                </td>
-                <td class="text-right">
-                    <span data-bind="text: pendingToday"></span>
-                </td>
-                <td class="text-center">
-                    of
-                </td>
-                <td>
-                    <span data-bind="text: tasks"></span>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    </div>
-<?php
-        }
-
-    public static function writeTabsHeader (\Chores\Model $model)
-        {
-?>
-    <div data-bind="if: selectedCategory() != 0" class="clearfix">
-        <div class="pull-right"><button class="btn btn-light" data-bind="click: function () { selectedCategory(0); selectedTab('categories'); }">Top Categories</button></div>
-    </div>
-    <ul class="nav nav-tabs">
-      <li data-bind="css: { active: 'categories'==selectedTab() }, click: function () { selectedTab('categories'); }" class="nav-link">
-          <a href="#">
-              <i class="fa fa-tags"></i>
-              Subcategories
-              (<span data-bind="text: selectedCategories().length"></span>)</a>
-      </li>
-      <li data-bind="css: { active: 'tasks'==selectedTab() }, click: function () { selectedTab('tasks'); }" class="nav-link">
-          <a href="#">
-              <i class="fa fa-th-list"></i>
-              Tasks
-              (<span data-bind="text: selectedTasks().length"></span>)</a>
-      </li>
-    </ul>
+    <ul class="list-group" data-bind="template: { name: 'category-tree', data: { list: topLevelCategories, root: $data, indent: 0 } }" />
 <?php
         }
 
     public static function writeTasks (\Chores\Model $model)
         {
 ?>
-    <div data-bind="if: 'tasks'==selectedTab()">
     <table class="table table-hover table-bordered">
         <thead>
             <tr>
@@ -150,13 +106,38 @@ class ChoresView
             </tr>
         </tbody>
     </table>
-    </div>
 <?php
         }
 
     public static function writeEditTaskDialog (\Chores\Model $model) : \stdClass
         {
         return Common::writeEditForm(self::ID_EDIT_TASKS_DLG, $model->getTaskPropertyMap());
+        }
+
+    public static function writeTemplates (\Chores\Model $model)
+        {
+?>
+    <script type="text/html" id="category-tree">
+        <!-- ko foreach: list -->
+         <li menuid="" role="button" data-bind="click: navigateTo, css: {active: id()==$parent.root.selectedCategory()}" class="list-group-item list-group-item-action d-flex justify-content-between">
+            <span>
+              <span data-bind="style: { 'margin-left' : ($parent.indent * 20)+'px'}, click: toggle">
+                <span  data-bind="if: subcategories().length == 0"><i class="fa fa-tag"></i></span>
+                <span  data-bind="if: subcategories().length > 0 && isExpanded()"><i class="fa fa-minus"></i></span>
+                <span  data-bind="if: subcategories().length > 0 && !isExpanded()"><i class="fa fa-plus"></i></span>
+              </span>
+              <span data-bind="text: label"></span>
+            </span>
+            <span class="badge" data-bind="css: { 'badge-danger': pendingToday() > 0, 'badge-primary' : pendingToday() == 0}">
+                <span data-bind="text: pendingToday"></span>
+            </span>
+         </li>
+         <div data-bind="if: isExpanded">
+            <div class="list-group" data-bind="template: { name: 'category-tree', data: { list: subcategories, root: $parent.root, indent: $parent.indent + 1 } }" />
+         </div>
+         <!-- /ko -->
+     </script>
+<?php
         }
 
     public static function writeScripts (\Chores\Model $model)
@@ -201,11 +182,18 @@ class ChoresView
         row.navigateTo = function ()
             {
             model.selectedCategory(row.id());
-            if (0 == row.id())
-                model.selectedTab('categories');
-            else
-                model.selectedTab('tasks');
             }
+        row.subcategories = ko.computed (function ()
+            {
+            var ret = $.grep (model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == row.id(); });
+            return ret;
+            });
+        row.isExpanded = ko.observable(true);
+        row.toggle = function ()
+            {
+            if (row.subcategories().length)
+                row.isExpanded(!row.isExpanded());
+            };
         }
     function adjustTask (model, row)
         {
@@ -258,12 +246,15 @@ class ChoresView
         $model.selectedTasks = ko.computed (function ()
             {
             var filter = function (el) { return isInHierarchy($model, ko.unwrap(ko.unwrap(el).categoryId)); };
-            return $.grep ($model.tasks(), filter).sort(function (a, b) { return b.diff() - a.diff(); });
+            return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
         adjustCategories($model);
         adjustTasks($model);
+        $model.topLevelCategories = ko.computed (function ()
+            {
+            return $.grep ($model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == 0; });
+            });
         $model.selectedCategory.extend({ urlSync: "s_c" });
-        $model.selectedTab = ko.observable('categories').extend({ urlSync: "t_b" });
         <?=$initTasksDialog->initFn?>($model);
         }
 </script>

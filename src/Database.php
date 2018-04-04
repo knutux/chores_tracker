@@ -56,6 +56,16 @@ class Database extends DatabaseCore
         return $tables;
         }
 
+    public function clearDatabase(string &$error = null) : bool
+        {
+        foreach (array (self::TABLE_CHORES, self::TABLE_CHORES_CATEGORY, self::TABLE_CHORES_COMPLETED, self::TABLE_CHORES_SCHEDULE) as $tableName)
+            {
+            if (!$this->executeTruncateTable($tableName, $error))
+                return false;
+            }
+        return true;
+        }
+        
     protected function initializeTable (string $tableName, string &$error = null) : bool
         {
         switch ($tableName)
@@ -119,7 +129,8 @@ SELECT ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Ne
  LEFT OUTER JOIN `$tableCompleted` lt ON lt.`Chores Id` = ch.`Id`
 WHERE $where $permissionFilter
 GROUP BY ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`
-ORDER BY (ch.`Next Date`-DATE('now')) * ch.`Frequency` ASC
+ORDER BY (CASE WHEN date('now')>ch.`Next Date` THEN -1 * (julianday('now')-julianday(ch.`Next Date`)) / ch.`Frequency` ELSE ch.`Next Date` END) ASC,
+         ch.`Frequency`
 EOT;
         $rows = $this->executeSelect ($tableName, $sql, $error);
         return $rows;

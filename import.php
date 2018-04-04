@@ -5,7 +5,7 @@ require __DIR__ . '/vendor/autoload.php';
 $error = NULL;
 
 try {
-    $db = \Chores\Database::GetInstance();
+    $db = \Chores\Database::GetInstance(true);
     $model = new \Chores\Model ();
     $isLogedIn = $model->isLoggedIn ($db, $_POST, $error);
     if ($isLogedIn)

@@ -362,6 +362,15 @@ EOT;
             return false;
             }
 
+// Warning: do not commit the next line
+// define ("ENABLE_CLEAR_DURING_IMPORT", true);
+        if ($clearBeforeImport)
+            {
+            if (!defined ('ENABLE_CLEAR_DURING_IMPORT'))
+                die ("Error: Please set <b>ENABLE_CLEAR_DURING_IMPORT</b> constant to enable clearing");
+            $db->clearDatabase();
+            }
+            
         $cnt = count($contents);
         $messages[] = "{$cnt} rows found";
         
@@ -390,7 +399,10 @@ EOT;
                 }
             
             list ($categoryId, $path) = $categoryId;
-            $taskId = $this->createTask($db, $categoryId, $path, $row->task, $row->frequency, $row->cost, $row->nextDate, $error);
+            $row->cost = (int)$row->cost;
+            $cost = empty ($row->cost) ? null : ($row->cost >= 5 ? $row->cost : 60 * $row->cost); // convert hours to minutes
+
+            $taskId = $this->createTask($db, $categoryId, $path, $row->task, $row->frequency, $cost, $row->nextDate, $error);
             if (false === $taskId)
                 {
                 $errors[] = $error;
@@ -398,12 +410,12 @@ EOT;
                 }
             }
             
-        $errors[] = "N/I";
-        return false;
+        $messages[] = "Import has completed successfully";
+        return true;
         }
     
     protected function createTask (Database $db, int $categoryId, string $path = null,
-                                   string $label = null, int $frequency = null, int $cost = null,
+                                   string $label = null, int $frequency = null, float $cost = null,
                                    string $nextDate = null, string &$error = null)
         {
         $cost = NULL === $cost ? 'NULL' : $cost;
@@ -414,6 +426,7 @@ EOT;
     VALUES
 ($label, '-', $categoryId, 1, '$nextDate', $frequency, $cost, '$path')
 EOT;
+
         return $db->executeInsert(Database::TABLE_CHORES, $sql, $error);
         }
     
@@ -452,7 +465,7 @@ EOT;
             $existingCategories[] = ['Id' => $categoryId, 'Label' => $subCategory, 'Parent Id' => $mainCategoryId, 'Path' => $path];
             }
             
-        return [$mainCategoryId, $path.'_'];
+        return [$categoryId, $path.'_'];
         }
     
     protected function createCategory (Database $db, string $category, int $parentId = null, string $path = null, string &$error = null)
@@ -496,6 +509,7 @@ EOT;
                         'nextDate' => $data[$header['Next Date']],
                         'cost' => $data[$header['Cost']],
                     ];
+
             $rows[] = $row;
             }
         
