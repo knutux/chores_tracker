@@ -92,7 +92,7 @@ class Common
 <?php
         }
 
-    public static function writeLoginForm (string $title, $error)
+    public static function writeLoginForm (string $title, string $buttonTitle = "Login", string $error = null)
         {
 ?>
     <!-- LOGIN FORM -->
@@ -114,7 +114,7 @@ class Common
 						<input type="password" class="form-control" id="<?=self::FIELD_PASSWORD?>" name="<?=self::FIELD_PASSWORD?>" placeholder="password">
 					</div>
 				</div>
-				<button type="submit" class="login-button"><i class="fa fa-chevron-right"></i> Create</button>
+				<button type="submit" class="login-button"><i class="fa fa-chevron-right"></i> <?=$buttonTitle?></button>
 			</div>
 		</form>
 	</div>

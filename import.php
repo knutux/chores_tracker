@@ -18,7 +18,7 @@ try {
 Chores\Views\Common::writeHTMLHeader("Chores Tracker Import", "Track your chores, categorize them, set frequency and priorities.");
 
 if (!$isLogedIn)
-    Chores\Views\Common::writeLoginForm("Please enter your credentials", $error);
+    Chores\Views\Common::writeLoginForm("Please enter your credentials", "Login", $error);
 else
     \Chores\Views\ImportView::write($model);
 

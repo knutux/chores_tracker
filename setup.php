@@ -22,5 +22,5 @@ if (!empty ($_POST[Chores\Views\Common::FIELD_USERNAME]) && !empty ($_POST[Chore
     }
 
 Chores\Views\Common::writeHTMLHeader("Chores Tracker - Setup Database", "Track your chores, categorize them, set frequency and priorities.");
-Chores\Views\Common::writeLoginForm("Define Admin User", $error);
+Chores\Views\Common::writeLoginForm("Define Admin User", "Create", $error);
 Chores\Views\Common::writeHTMLFooter();
