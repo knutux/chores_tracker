@@ -67,8 +67,16 @@ class ChoresView
             <tr>
                 <td width="50%">Label</td>
                 <td width="10%">Next Date</td>
-                <td width="10%">Frequency</td>
-                <td width="10%">Cost</td>
+                <td width="10%">
+                    Frequency
+                    <br>
+                    <span class="small"><span data-bind="text: tasksPerDay"></span> per day</span>
+                </td>
+                <td width="10%">
+                    Cost
+                    <br>
+                    <span class="small"><span data-bind="text: minutesPerDay"></span> per day</span>
+                </td>
                 <td width="10%">Actions</td>
             </tr>
         </thead>
@@ -272,24 +280,74 @@ class ChoresView
             {
             return $.grep ($model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == $model.selectedCategory(); });
             });
-        $model.selectedTasks = ko.computed (function ()
+        $model.flatTasks = ko.computed (function ()
             {
             var filter = function (el)
                 {
                 var cat = ko.unwrap(ko.unwrap(el).categoryId);
                 if ($model.selectedCategory() == cat)
                     return true;
-                if ($model.textFilter().length == 0 && el.diff() < -1)
-                    return false;
                 var inHierarchy = 0 == $model.selectedCategory() || isInHierarchy($model, cat);
                 if (!inHierarchy)
+                    return false;
+                return true;
+                }
+            return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
+            });
+        $model.selectedTasks = ko.computed (function ()
+            {
+            var filter = function (el)
+                {
+                if ($model.textFilter().length == 0 && el.diff() < -1)
                     return false;
                 var label = el.label();
                 if (null === label)
                     return false;
                 return label.toLowerCase().indexOf ($model.textFilter().toLowerCase()) != -1;
                 }
-            return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
+            return $.grep ($model.flatTasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
+            });
+        var niceNumber = function (num)
+            {
+            var r = Math.round(num * 100) / 100;
+            if (r >= 1)
+                r = Math.round(num * 10) / 10;
+            if (r >= 10)
+                r = Math.round(num);
+            return r;
+            };
+        $model.tasksPerDay = ko.computed (function ()
+            {
+            var totalTasks = 0;
+            var tasks = $model.flatTasks();
+            tasks.forEach(function(el)
+                {
+                var frequency = el.frequency();
+                if (0 == frequency || null == frequency)
+                    frequency = 1;
+                totalTasks += 1.0 / frequency;
+                });
+            return niceNumber(totalTasks);
+            });
+        $model.minutesPerDay = ko.computed (function ()
+            {
+            var totalTasks = 0;
+            var tasks = $model.flatTasks();
+            tasks.forEach(function(el)
+                {
+                var cost = el.cost();
+                if (0 == cost || null == cost)
+                    cost = 30;
+                var frequency = el.frequency();
+                if (0 == frequency || null == frequency)
+                    frequency = 1;
+                totalTasks += cost / frequency;
+                });
+            var mins = niceNumber(totalTasks);
+            if (mins >= 1)
+                return niceNumber (totalTasks / 60) + " h";
+
+            return mins + " min";
             });
         adjustCategories($model);
         adjustTasks($model);
