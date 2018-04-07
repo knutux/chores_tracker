@@ -77,7 +77,10 @@ class ChoresView
                     <br>
                     <span class="small"><span data-bind="text: minutesPerDay"></span> per day</span>
                 </td>
-                <td width="10%">Actions</td>
+                <td width="10%">Actions
+                    <br>
+                    <span class="small"><span data-bind="text: minutesToday"></span> left</span>
+                </td>
             </tr>
         </thead>
         <tbody data-bind="foreach: selectedTasks">
@@ -342,6 +345,25 @@ class ChoresView
                 if (0 == frequency || null == frequency)
                     frequency = 1;
                 totalTasks += cost / frequency;
+                });
+            var mins = niceNumber(totalTasks);
+            if (mins >= 1)
+                return niceNumber (totalTasks / 60) + " h";
+
+            return mins + " min";
+            });
+        $model.minutesToday = ko.computed (function ()
+            {
+            var totalTasks = 0;
+            var tasks = $model.flatTasks();
+            tasks.forEach(function(el)
+                {
+                if (el.diff() < 0)
+                    return;
+                var cost = el.cost();
+                if (0 == cost || null == cost)
+                    cost = 30;
+                totalTasks += cost;
                 });
             var mins = niceNumber(totalTasks);
             if (mins >= 1)
