@@ -288,9 +288,7 @@ class ChoresView
             var filter = function (el)
                 {
                 var cat = ko.unwrap(ko.unwrap(el).categoryId);
-                if ($model.selectedCategory() == cat)
-                    return true;
-                var inHierarchy = 0 == $model.selectedCategory() || isInHierarchy($model, cat);
+                var inHierarchy = 0 == $model.selectedCategory() || $model.selectedCategory() == cat || isInHierarchy($model, cat);
                 if (!inHierarchy)
                     return false;
                 return true;
@@ -301,8 +299,15 @@ class ChoresView
             {
             var filter = function (el)
                 {
-                if ($model.textFilter().length == 0 && el.diff() < -1)
-                    return false;
+                if ($model.textFilter().length == 0)
+                    {
+                    if (el.diff() < -1)
+                        return false;
+                    var cat = ko.unwrap(ko.unwrap(el).categoryId);
+                    if ($model.selectedCategory() == cat)
+                        return true;
+                    }
+
                 var label = el.label();
                 if (null === label)
                     return false;
