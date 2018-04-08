@@ -301,11 +301,11 @@ class ChoresView
                 {
                 if ($model.textFilter().length == 0)
                     {
-                    if (el.diff() < -1)
-                        return false;
                     var cat = ko.unwrap(ko.unwrap(el).categoryId);
                     if ($model.selectedCategory() == cat)
                         return true;
+                    if (el.diff() < -1)
+                        return false;
                     }
 
                 var label = el.label();
