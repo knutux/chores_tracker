@@ -352,7 +352,7 @@ class ChoresView
                 totalTasks += cost / frequency;
                 });
             var mins = niceNumber(totalTasks);
-            if (mins >= 1)
+            if (mins >= 60)
                 return niceNumber (totalTasks / 60) + " h";
 
             return mins + " min";
@@ -371,7 +371,7 @@ class ChoresView
                 totalTasks += cost;
                 });
             var mins = niceNumber(totalTasks);
-            if (mins >= 1)
+            if (mins >= 60)
                 return niceNumber (totalTasks / 60) + " h";
 
             return mins + " min";
