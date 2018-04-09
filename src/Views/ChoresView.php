@@ -266,7 +266,7 @@ class ChoresView
             if (time >= 30)
                 return niceNumber (time / 60) + " h / d";
 
-            return time + " min / d";
+            return niceNumber(time) + " min / d";
             });
         row.markDoneYesterday = function ()
             {
