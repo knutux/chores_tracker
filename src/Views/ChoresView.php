@@ -102,6 +102,7 @@ class ChoresView
                 <td class="text-right">
                     <div data-bind="if: cost() > 0"><span data-bind="text: cost"></span> min.</div>
                     <div data-bind="if: cost() == 0" class="text-muted">N/A</div>
+                    <div class="small" data-bind="text: timePerDayH, css: { 'text-danger': timePerDay() >= 30, 'text-warning': timePerDay() >= 10 }"></div>
                 </td>
                 <td class="btn-group" role="group" aria-label="Actions">
                     <button role="button" data-bind="click:markDone, disabled: executing, css: {disabled: executing}" class="btn btn-success">
@@ -220,6 +221,15 @@ class ChoresView
                 row.isExpanded(!row.isExpanded());
             };
         }
+    function niceNumber (num)
+        {
+        var r = Math.round(num * 100) / 100;
+        if (r >= 1)
+            r = Math.round(num * 10) / 10;
+        if (r >= 10)
+            r = Math.round(num);
+        return r;
+        };
     function adjustTask (model, row)
         {
         row.executing = ko.observable(false);
@@ -240,6 +250,24 @@ class ChoresView
             {
             ajaxCall(model.baseUrl, 'done', { id: row.id(), today: 1 }, model, row.executing, updateRow);
             }
+        row.timePerDay = ko.computed (function ()
+            {
+            var cost = row.cost();
+            if (0 == cost || null == cost)
+                cost = 30;
+            var frequency = row.frequency();
+            if (0 == frequency || null == frequency)
+                frequency = 1;
+            return cost / frequency;
+            });
+        row.timePerDayH = ko.computed (function ()
+            {
+            var time = row.timePerDay();
+            if (time >= 30)
+                return niceNumber (time / 60) + " h / d";
+
+            return time + " min / d";
+            });
         row.markDoneYesterday = function ()
             {
             ajaxCall(model.baseUrl, 'done', { id: row.id(), today: 0 }, model, row.executing, updateRow);
@@ -295,6 +323,7 @@ class ChoresView
                 }
             return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
+        adjustTasks($model);
         $model.selectedTasks = ko.computed (function ()
             {
             var filter = function (el)
@@ -315,15 +344,6 @@ class ChoresView
                 }
             return $.grep ($model.flatTasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
-        var niceNumber = function (num)
-            {
-            var r = Math.round(num * 100) / 100;
-            if (r >= 1)
-                r = Math.round(num * 10) / 10;
-            if (r >= 10)
-                r = Math.round(num);
-            return r;
-            };
         $model.tasksPerDay = ko.computed (function ()
             {
             var totalTasks = 0;
@@ -343,13 +363,7 @@ class ChoresView
             var tasks = $model.flatTasks();
             tasks.forEach(function(el)
                 {
-                var cost = el.cost();
-                if (0 == cost || null == cost)
-                    cost = 30;
-                var frequency = el.frequency();
-                if (0 == frequency || null == frequency)
-                    frequency = 1;
-                totalTasks += cost / frequency;
+                totalTasks += el.timePerDay();
                 });
             var mins = niceNumber(totalTasks);
             if (mins >= 60)
@@ -377,7 +391,6 @@ class ChoresView
             return mins + " min";
             });
         adjustCategories($model);
-        adjustTasks($model);
         $model.topLevelCategories = ko.computed (function ()
             {
             return $.grep ($model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == 0; });
