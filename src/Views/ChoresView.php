@@ -88,7 +88,7 @@ class ChoresView
                 <td data-bind="text: label">
 
                 </td>
-                <td data-bind="css: { 'bg-success' : diff() < -1, 'bg-danger': diff() > 3, 'bg-warning': diff() > 0, 'bg-secondary': diff()==0, 'bg-info': diff()==-1}"  class="text-center">
+                <td data-bind="css: { 'bg-success' : diff() < -1, 'bg-danger': diff() > frequency(), 'bg-warning': diff() > 0, 'bg-secondary': diff()==0, 'bg-info': diff()==-1}"  class="text-center">
                     <div data-bind="text: nextDate">
                     </div>
                     (<span data-bind="if: diff() > 0">overdue <span data-bind="text: diff"></span> days</span
