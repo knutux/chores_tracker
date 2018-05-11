@@ -5,3 +5,5 @@
 /chores.db
 /composer.phar
 /*.csv
+/error_log
+
