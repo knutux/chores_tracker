@@ -50,6 +50,10 @@ class Ajax
                 $id = self::getIntegerParam($postArgs, 'id');
                 $result = $model->markTaskDone ($db, $id, self::getBooleanParam($postArgs, 'today', true));
                 break;
+            case "archive":
+                $id = self::getIntegerParam($postArgs, 'id');
+                $result = $model->archiveTask ($db, $id);
+                break;
             case "edit":
                 $type = $message[1] ?? '??';
                 $id = self::getIntegerParam($postArgs, 'id');

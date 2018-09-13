@@ -126,6 +126,7 @@ class Model
             'frequency' => self::createFieldDefinition('Frequency', 'number'),
             'nextDate' => self::createFieldDefinition('Next Date', 'date'),
             'cost' => self::createFieldDefinition('Cost', 'number'),
+            'archived' => self::createFieldDefinition('Archived', 'number'),
             'id' => self::markIdField(self::createFieldDefinition('Id')),
             'lastDate' => self::markFieldReadonly(self::createFieldDefinition('Last Date', 'date')),
             'diff' => self::createCalculatedFieldDefinition('Diff', function ($row)
@@ -375,6 +376,36 @@ EOT;
         return true;
         }
 
+    public function archiveTask (Database $db, int $id, bool $archive = true) : \stdClass
+        {
+        $model = $this->createModelObject ($db);
+        $model->success = false;
+        if (!is_numeric($id) || $id <= 0)
+            {
+            $model->errors[] = "Invalid id - $id";
+            return $model;
+            }
+
+        $tableName = Database::TABLE_CHORES;
+        $val = $archive ? 1 : 0;
+        $sql = "SET `Archived`=$val WHERE `Id`=$id";
+        if (false === $db->executeUpdate ($tableName, $sql, $error))
+            {
+            // ensure column "Archived" exists
+            $sqlAlter = "ALTER TABLE `$tableName` ADD COLUMN `Archived` TINYINT DEFAULT 0";
+            if (false === $db->executeSQL ($tableName, $sqlAlter, $error) ||
+                false === $db->executeUpdate ($tableName, $sql, $error))
+                {
+                $model->errors[] = $error;
+                return $model;
+                }
+            }
+        
+        $model->row = $this->getChangedRow ($model, $db, $id);
+        $model->success = true;
+        return $model;
+        }
+
     public function markTaskDone (Database $db, int $id = null, bool $markToday = null) : \stdClass
         {
         $model = $this->createModelObject ($db);
@@ -393,21 +424,25 @@ EOT;
             return $model;
             }
                     
+        $model->row = $this->getChangedRow ($model, $db, $id);
+        $model->success = true;
+        return $model;
+        }
+
+    public function getChangedRow (\stdClass $model, Database $db, int $id)
+        {
         $row = $db->selectSingleTasks ($id, $error);
         if (false === $row)
             {
             $model->errors[] = $error;
             return $model;
             }
-        
+
         $props = $this->getTaskPropertyMap ();
         $model->props = array_keys($props);
 
         $instance = $this->mapDBPropertiesToModelSingle ($row, $props);
-
-        $model->row = $instance;
-        $model->success = true;
-        return $model;
+        return $instance;
         }
         
     public function importData (Database $db, string $fileName, bool $clearBeforeImport)

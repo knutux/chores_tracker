@@ -57,6 +57,12 @@ class ChoresView
 ?>
     <div class="clearfix">
       <div class="btn-group btn-group-sm d-flex justify-content-end float-right" role="group" aria-label="Task actions">
+        <div class="text-right form-check">
+            <input class="form-check-input" type="checkbox" value="" id="show_archived" data-bind="checked:showArchived">
+            <label class="small form-check-label" for="show_archived">
+              +archived
+            </label>
+        </div>
         <input type="text" class="form-control form-control-sm" id="search-input" placeholder="Search..." data-bind="value: textFilter">
         <button role="button" data-bind="attr: { disabled: selectedCategory() == 0 }, click: createTask" class="btn btn-secondary"><i class="fa fa-plus"></i> Add new</button>
       </div>
@@ -65,7 +71,8 @@ class ChoresView
     <table class="table table-hover table-bordered">
         <thead>
             <tr>
-                <td width="50%">Label</td>
+                <td width="50%">Label
+                </td>
                 <td width="10%">Next Date</td>
                 <td width="10%">
                     Frequency
@@ -84,17 +91,20 @@ class ChoresView
             </tr>
         </thead>
         <tbody data-bind="foreach: selectedTasks">
-            <tr>
+            <tr data-bind="css: { 'text-muted' : archived}">
                 <td data-bind="text: label">
 
                 </td>
-                <td data-bind="css: { 'bg-success' : diff() < -1, 'bg-danger': diff() > frequency(), 'bg-warning': diff() > 0, 'bg-secondary': diff()==0, 'bg-info': diff()==-1}"  class="text-center">
+                <td data-bind="css: { 'bg-success' : !archived() && diff() < -1, 'bg-danger': !archived() && diff() > frequency(), 'bg-warning': !archived() && diff() > 0, 'bg-secondary': !archived() && diff()==0, 'bg-info': !archived() && diff()==-1, 'text-muted' : archived}"  class="text-center">
                     <div data-bind="text: nextDate">
                     </div>
+                    <div data-bind="if: archived">Archived</div>
+                    <div data-bind="ifnot: archived">
                     (<span data-bind="if: diff() > 0">overdue <span data-bind="text: diff"></span> days</span
                     ><span data-bind="if: diff() < -1">due in <span data-bind="text: Math.abs(diff())"></span> days</span
                     ><span data-bind="if: diff() == -1">due tomorrow</span
                     ><span data-bind="if: diff() == 0">due today</span>)
+                    </div>
                 </td>
                 <td class="text-right">
                     every <span data-bind="text: frequency"></span> day(s)
@@ -102,7 +112,9 @@ class ChoresView
                 <td class="text-right">
                     <div data-bind="if: cost() > 0"><span data-bind="text: cost"></span> min.</div>
                     <div data-bind="if: cost() == 0" class="text-muted">N/A</div>
-                    <div class="small" data-bind="text: timePerDayH, css: { 'text-danger': timePerDay() >= 30, 'text-warning': timePerDay() >= 10 }"></div>
+                    <div data-bind="ifnot:archived">
+                        <div class="small" data-bind="text: timePerDayH, css: { 'text-danger': timePerDay() >= 30, 'text-warning': timePerDay() >= 10 }"></div>
+                    </div>
                 </td>
                 <td class="btn-group" role="group" aria-label="Actions">
                     <button role="button" data-bind="click:markDone, disabled: executing, css: {disabled: executing}" class="btn btn-success">
@@ -125,6 +137,11 @@ class ChoresView
                               <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
                               <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
                               yesterday
+                          </a>
+                          <a class="dropdown-item" href="#" data-bind="click:archiveTask">
+                              <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
+                              <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
+                              Archive
                           </a>
                         </div>
                     </div>
@@ -272,6 +289,10 @@ class ChoresView
             {
             ajaxCall(model.baseUrl, 'done', { id: row.id(), today: 0 }, model, row.executing, updateRow);
             }
+        row.archiveTask = function ()
+            {
+            ajaxCall(model.baseUrl, 'archive', { id: row.id() }, model, row.executing, updateRow);
+            }
         }
     function adjustCategories (model)
         {
@@ -311,7 +332,7 @@ class ChoresView
             {
             return $.grep ($model.categories(), function (el) { return ko.unwrap(ko.unwrap(el).parentId) == $model.selectedCategory(); });
             });
-        $model.flatTasks = ko.computed (function ()
+        $model.flatAllTasks = ko.computed (function ()
             {
             var filter = function (el)
                 {
@@ -323,11 +344,24 @@ class ChoresView
                 }
             return $.grep ($model.tasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
+        $model.flatTasks = ko.computed (function ()
+            {
+            var filter = function (el)
+                {
+                if (ko.unwrap(ko.unwrap(el).archived))
+                    return false;
+                return true;
+                }
+            return $.grep ($model.flatAllTasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
+            });
+        $model.showArchived = ko.observable (false);
         adjustTasks($model);
         $model.selectedTasks = ko.computed (function ()
             {
             var filter = function (el)
                 {
+                if (!$model.showArchived() && ko.unwrap(ko.unwrap(el).archived))
+                    return false;
                 if ($model.textFilter().length == 0)
                     {
                     var cat = ko.unwrap(ko.unwrap(el).categoryId);
@@ -342,7 +376,7 @@ class ChoresView
                     return false;
                 return label.toLowerCase().indexOf ($model.textFilter().toLowerCase()) != -1;
                 }
-            return $.grep ($model.flatTasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
+            return $.grep ($model.flatAllTasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
         $model.tasksPerDay = ko.computed (function ()
             {

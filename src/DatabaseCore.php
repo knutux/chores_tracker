@@ -187,7 +187,7 @@ EOT;
         $success = @$this->db->exec($sql);
         if (!$success)
             {
-            $error = $this->db->lastErrorMsg ();
+            $error = $this->db->lastErrorMsg () . " (".$this->db->lastErrorCode ().")";
             if ($this->debug)
                 {
                 //var_dump ();exit();
@@ -197,11 +197,16 @@ EOT;
         return $success;
         }
 
+    protected function getLastErrorId () : int
+        {
+        return $this->db->lastErrorCode ();
+        }
+
     protected function checkExecutionError (bool $result, string $sql, string &$error = null) : bool
         {
         if (!$result)
             {
-            $error = $this->db->lastErrorMsg ();
+            $error = $this->db->lastErrorMsg () . " (".$this->db->lastErrorCode ().")";
             if ($this->debug)
                 {
                 $error .= " ( $sql )";
@@ -245,6 +250,15 @@ EOT;
         return true;
         }
         
+    public function executeSQL ($tableName, $sql, &$error = null, $accessAlreadyChecked = false)
+        {
+        $permissionFilter = $accessAlreadyChecked ? "1=1" : $this->createPermissionFilter ('Permission Group');
+        $success = @$this->db->exec($sql);
+        if (!$this->checkExecutionError ($success, $sql, $error))
+            return false;
+        return true;
+        }
+
     public function executeSelectSingle (string $tableName, string $sql, string &$error = null)
         {
         $ret = @$this->db->querySingle($sql);

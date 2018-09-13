@@ -124,7 +124,7 @@ EOT;
         $where = empty ($where) ? "" : "($where) AND ";
         $sql = <<<EOT
 SELECT ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`,
-       MAX(lt.`Date`) `Last Date`
+       MAX(lt.`Date`) `Last Date`, `Archived`
  FROM `$tableName` ch
  LEFT OUTER JOIN `$tableCompleted` lt ON lt.`Chores Id` = ch.`Id`
 WHERE $where $permissionFilter
