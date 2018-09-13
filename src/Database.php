@@ -45,7 +45,7 @@ class Database extends DatabaseCore
                 ["`Id` INTEGER PRIMARY KEY", "`Label` STRING", "`Parent Id` INTEGER NULL", "`Path` STRING", "`Notes` STRING NULL", "`Priority` INTEGER", "`Permission Group` INTEGER"],
                 'unique' => array ("`Parent Id`, `Label`"), 'index' => array ("`Permission Group`, `Path`"), 'initialize' => true);
         $tables[self::TABLE_CHORES] = (object)array ('columns' =>
-                ["`Id` INTEGER PRIMARY KEY", "`Label` STRING", "`Category Id` INTEGER", "`Path` STRING", "`Notes` STRING NULL", "`Frequency` INTEGER", "`Next Date` DATE", "`Cost` REAL NULL", "`Permission Group` INTEGER"],
+                ["`Id` INTEGER PRIMARY KEY", "`Label` STRING", "`Archived` SMALLINT DEFAULT 0", "`Category Id` INTEGER", "`Path` STRING", "`Notes` STRING NULL", "`Frequency` INTEGER", "`Next Date` DATE", "`Cost` REAL NULL", "`Permission Group` INTEGER"],
                 'unique' => array ("`Category Id`, `Label`"), 'index' => array ("`Path`, `Permission Group`", "`Category Id`, `Next Date`", "`Next Date`"), 'initialize' => true);
         $tables[self::TABLE_CHORES_COMPLETED] = (object)array ('columns' =>
                 ["`Chores Id` INTEGER", "`User Id` INTEGER", "`Date` DATE", "`Notes` STRING NULL"],
