@@ -107,7 +107,7 @@ GROUP BY cat.`Id`, cat.`Label`, cat.`Parent Id`
 ORDER BY `Priority` ASC
 EOT;
 
-        $rows = $this->executeSelect ($tableName, $sql, $error);var_dump ($rows);
+        $rows = $this->executeSelect ($tableName, $sql, $error);
         return $rows;
         }
         
