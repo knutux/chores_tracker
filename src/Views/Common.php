@@ -32,6 +32,7 @@ class Common
     <!--link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"-->
     <link href="https://maxcdn.bootstrapcdn.com/bootswatch/4.0.0/litera/bootstrap.min.css" rel="stylesheet" integrity="sha384-MmFGSHKWNFDZYlwAtfeY6ThYRrYajzX+v7G4KVORjlWAG0nLhv0ULnFETyWGeQiU" crossorigin="anonymous">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.bundle.min.js" integrity="sha384-feJI7QwhOS+hwpX2zkaeJQjeiwlhOP+SdQDqhgvvo1DsjtiSQByFdThsxO669S2D" crossorigin="anonymous"></script>
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
@@ -148,6 +149,45 @@ class Common
         {
 ?>
 <script>
+    ko.bindingHandlers.popover =
+        {
+        init: function(element, valueAccessor)
+            {
+            var local = ko.utils.unwrapObservable(valueAccessor()),
+                options = {};
+
+            ko.utils.extend(options, ko.bindingHandlers.popover.options);
+            ko.utils.extend(options, local);
+
+            if (options.content)
+                {
+                // using a simple replaceemnt from https://stackoverflow.com/questions/37684/how-to-replace-plain-urls-with-links
+
+                //URLs starting with http://, https://, or ftp://
+                replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
+                options.content = ko.unwrap (options.content).replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
+
+                //URLs starting with "www." (without // before it, or it'd re-link the ones done above).
+                replacePattern2 = /(^|[^\/])(www\.[\S]+(\b|$))/gim;
+                options.content = options.content.replace(replacePattern2, '$1<a href="http://$2" target="_blank">$2</a>');
+
+                options.content = options.content.replace('\n', '<br>');
+                }
+            $(element).popover(options);
+
+            ko.utils.domNodeDisposal.addDisposeCallback(element, function()
+                {
+                $(element).popover("destroy");
+                });
+            },
+        options:
+            {
+            placement: "right",
+            trigger: "click",
+            html: true
+            }
+        };
+
     function ajaxCall (baseUrl, fn, data, model, progress, successCallback)
         {
         if (progress())
@@ -214,12 +254,26 @@ class Common
                 continue;
             
             $visibleParams[$id] = $def;
+
+            if ('multiline' == $def->type)
+                {
+?>
+            <div class="form-group row">
+                <label for="<?=$id?>" class="col-sm-2 form-control-label form-control-label-sm"><?=$def->label?></label>
+                <textarea class="col-sm-10 form-control form-control-sm" rows="5" id="<?=$id?>" placeholder="<?=$def->placeholder?>" data-bind="value: data.<?=$id?>">
+                </textarea>
+            </div>
+<?php
+                }
+            else
+                {
 ?>
             <div class="form-group row">
                 <label for="<?=$id?>" class="col-sm-2 form-control-label form-control-label-sm"><?=$def->label?></label>
                 <input type="<?=$def->type?>" class="col-sm-10 form-control form-control-sm" id="<?=$id?>" placeholder="<?=$def->placeholder?>" data-bind="value: data.<?=$id?>">
             </div>
 <?php
+                }
             }
 ?>
         </form>

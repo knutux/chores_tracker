@@ -92,8 +92,9 @@ class ChoresView
         </thead>
         <tbody data-bind="foreach: selectedTasks">
             <tr data-bind="css: { 'text-muted' : archived}">
-                <td data-bind="text: label">
-
+                <td>
+                    <span data-bind="text: label"></span>
+                    <button class="btn btn-xs btn-link" data-bind="popover: { title: 'Notes', content: notes}"><i class="fa fa-file"></i></button>
                 </td>
                 <td data-bind="css: { 'bg-success' : !archived() && diff() < -1, 'bg-danger': !archived() && diff() > frequency(), 'bg-warning': !archived() && diff() > 0, 'bg-secondary': !archived() && diff()==0, 'bg-info': !archived() && diff()==-1, 'text-muted' : archived}"  class="text-center">
                     <div data-bind="text: nextDate">

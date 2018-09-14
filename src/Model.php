@@ -122,7 +122,7 @@ class Model
             [
             'label' => self::createFieldDefinition('Label'),
             'categoryId' => self::markFieldReadonly(self::createFieldDefinition('Category Id')),
-            'notes' => self::createFieldDefinition('Notes'),
+            'notes' => self::createFieldDefinition('Notes', 'multiline'),
             'frequency' => self::createFieldDefinition('Frequency', 'number'),
             'nextDate' => self::createFieldDefinition('Next Date', 'date'),
             'cost' => self::createFieldDefinition('Cost', 'number'),
@@ -391,14 +391,8 @@ EOT;
         $sql = "SET `Archived`=$val WHERE `Id`=$id";
         if (false === $db->executeUpdate ($tableName, $sql, $error))
             {
-            // ensure column "Archived" exists
-            $sqlAlter = "ALTER TABLE `$tableName` ADD COLUMN `Archived` TINYINT DEFAULT 0";
-            if (false === $db->executeSQL ($tableName, $sqlAlter, $error) ||
-                false === $db->executeUpdate ($tableName, $sql, $error))
-                {
-                $model->errors[] = $error;
-                return $model;
-                }
+            $model->errors[] = $error;
+            return $model;
             }
         
         $model->row = $this->getChangedRow ($model, $db, $id);
