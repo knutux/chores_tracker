@@ -91,10 +91,15 @@ class Database extends DatabaseCore
         {
         $tableName = self::TABLE_CHORES_CATEGORY;
         $tableChores = self::TABLE_CHORES;
+
+        $sql = "SET `Path`=(SELECT cat.`Path` || '_' || cat.`Id` || '_' FROM `$tableName` cat WHERE cat.`Id`=`Category Id`) WHERE 1=1";
+        $a = $this->executeUpdate ($tableChores, $sql, $error);
+        //var_dump ($a, $sql);
+
         $permissionFilter = $this->createPermissionFilter ('Permission Group');
         $sql = <<<EOT
 SELECT cat.`Id`, cat.`Label`, (CASE WHEN cat.`Parent Id` IS NULL THEN 0 ELSE cat.`Parent Id` END) `Parent Id`,
-       COUNT(ch.`Id`) `Tasks`, COUNT(CASE WHEN ch.`Archived`<1 AND ch.`Next Date` <= DATE('now') THEN 1 ELSE NULL END) `Pending`
+       COUNT(ch.`Id`) `Tasks`, SUM(CASE WHEN ch.`Archived`=0 AND ch.`Next Date` <= DATE('now') THEN 1 ELSE 0 END) `Pending`
  FROM `$tableName` cat
  LEFT OUTER JOIN `$tableChores` ch ON ch.`Path` LIKE cat.`Path` || '\_' || cat.`Id` || '\_%' ESCAPE '\'
 WHERE $permissionFilter
@@ -102,7 +107,7 @@ GROUP BY cat.`Id`, cat.`Label`, cat.`Parent Id`
 ORDER BY `Priority` ASC
 EOT;
 
-        $rows = $this->executeSelect ($tableName, $sql, $error);
+        $rows = $this->executeSelect ($tableName, $sql, $error);var_dump ($rows);
         return $rows;
         }
         
