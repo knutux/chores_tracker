@@ -158,8 +158,9 @@ class Common
 
             ko.utils.extend(options, ko.bindingHandlers.popover.options);
             ko.utils.extend(options, local);
+            var content = options.content ? ko.unwrap (options.content) : null;
 
-            if (options.content)
+            if (options.content && options.content.length)
                 {
                 // using a simple replaceemnt from https://stackoverflow.com/questions/37684/how-to-replace-plain-urls-with-links
 
@@ -177,7 +178,7 @@ class Common
 
             ko.utils.domNodeDisposal.addDisposeCallback(element, function()
                 {
-                $(element).popover("destroy");
+                $(element).popover("dispose");
                 });
             },
         options:
