@@ -160,19 +160,19 @@ class Common
             ko.utils.extend(options, local);
             var content = options.content ? ko.unwrap (options.content) : null;
 
-            if (options.content && options.content.length)
+            if (content && content.length)
                 {
                 // using a simple replaceemnt from https://stackoverflow.com/questions/37684/how-to-replace-plain-urls-with-links
 
                 //URLs starting with http://, https://, or ftp://
                 replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-                options.content = ko.unwrap (options.content).replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
+                content = content.replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
 
                 //URLs starting with "www." (without // before it, or it'd re-link the ones done above).
                 replacePattern2 = /(^|[^\/])(www\.[\S]+(\b|$))/gim;
-                options.content = options.content.replace(replacePattern2, '$1<a href="http://$2" target="_blank">$2</a>');
+                content = content.replace(replacePattern2, '$1<a href="http://$2" target="_blank">$2</a>');
 
-                options.content = options.content.replace('\n', '<br>');
+                options.content = content.replace('\n', '<br>');
                 }
             $(element).popover(options);
 
