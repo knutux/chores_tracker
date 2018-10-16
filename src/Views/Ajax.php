@@ -52,7 +52,8 @@ class Ajax
                 break;
             case "archive":
                 $id = self::getIntegerParam($postArgs, 'id');
-                $result = $model->archiveTask ($db, $id);
+                $undo = self::getBooleanParam($postArgs, 'undo');
+                $result = $model->archiveTask ($db, $id, !$undo);
                 break;
             case "edit":
                 $type = $message[1] ?? '??';

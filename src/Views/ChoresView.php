@@ -142,7 +142,8 @@ class ChoresView
                           <a class="dropdown-item" href="#" data-bind="click:archiveTask">
                               <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
                               <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
-                              Archive
+                              <span data-bind="if: archived">Back to Inbox</span>
+                              <span data-bind="ifnot: archived">Archive</span>
                           </a>
                         </div>
                     </div>
@@ -292,7 +293,7 @@ class ChoresView
             }
         row.archiveTask = function ()
             {
-            ajaxCall(model.baseUrl, 'archive', { id: row.id() }, model, row.executing, updateRow);
+            ajaxCall(model.baseUrl, 'archive', { id: row.id(), undo: row.archived() }, model, row.executing, updateRow);
             }
         }
     function adjustCategories (model)
