@@ -122,6 +122,21 @@ EOT;
         return $rows;
         }
         
+    private function tryUpdateTable(string $tableName, string $error)
+        {
+        $missingColumn = false;
+        if (preg_match ('/no such column: .+\.(.+) \(/', $error, $m) > 0)
+            $missingColumn = $m[1];
+
+        if (self::TABLE_CHORES == $tableName)
+            {
+            if ($missingColumn == 'Skipped Date')
+                return $this->addTableColumn ($tableName, $missingColumn, 'DATE', $error2);
+            }
+
+        return false;
+        }
+
     public function selectTasksWhere(string $where = null, string &$error = null)
         {
         $tableName = self::TABLE_CHORES;
@@ -129,7 +144,7 @@ EOT;
         $permissionFilter = $this->createPermissionFilter ('Permission Group');
         $where = empty ($where) ? "" : "($where) AND ";
         $sql = <<<EOT
-SELECT ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`,
+SELECT ch.`Id`, ch.`Label`, ch.`Category Id`, ch.`Notes`, ch.`Frequency`, ch.`Next Date`, ch.`Cost`, (CASE WHEN ch.`Skipped Date`=date('now') THEN 1 ELSE 0 END) `Skipped`,
        MAX(lt.`Date`) `Last Date`, `Archived`
  FROM `$tableName` ch
  LEFT OUTER JOIN `$tableCompleted` lt ON lt.`Chores Id` = ch.`Id`
@@ -139,6 +154,9 @@ ORDER BY (CASE WHEN date('now')>ch.`Next Date` THEN -1 * (julianday('now')-julia
          ch.`Frequency`
 EOT;
         $rows = $this->executeSelect ($tableName, $sql, $error);
+        if (false === $rows && $this->tryUpdateTable ($tableName, $error))
+            $rows = $this->executeSelect ($tableName, $sql, $error);
+
         return $rows;
         }
 

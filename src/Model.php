@@ -127,6 +127,7 @@ class Model
             'nextDate' => self::createFieldDefinition('Next Date', 'date'),
             'cost' => self::createFieldDefinition('Cost', 'number'),
             'archived' => self::createFieldDefinition('Archived', 'number'),
+            'skipped' => self::createFieldDefinition('Skipped', 'number'),
             'id' => self::markIdField(self::createFieldDefinition('Id')),
             'lastDate' => self::markFieldReadonly(self::createFieldDefinition('Last Date', 'date')),
             'diff' => self::createCalculatedFieldDefinition('Diff', function ($row)
@@ -413,6 +414,29 @@ EOT;
         $today = date('Y-m-d', $markToday ? time() : strtotime('-1 day'));
         $row = $this->getTaskForUpdate($db, $id, $today, $error);
         if (false === $row || false === $this->updateTaskCompletedDate($db, $id, $today, $row, $error))
+            {
+            $model->errors[] = $error;
+            return $model;
+            }
+                    
+        $model->row = $this->getChangedRow ($model, $db, $id);
+        $model->success = true;
+        return $model;
+        }
+
+    public function skipTask (Database $db, int $id = null) : \stdClass
+        {
+        $model = $this->createModelObject ($db);
+        $model->success = false;
+        if (!is_numeric($id) || $id <= 0)
+            {
+            $model->errors[] = "Invalid id - $id";
+            return $model;
+            }
+            
+        $tableName = Database::TABLE_CHORES;
+        $sql = "SET `Skipped Date`=date('now') WHERE `Id`=$id";
+        if (false === $db->executeUpdate ($tableName, $sql, $error))
             {
             $model->errors[] = $error;
             return $model;

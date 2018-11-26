@@ -226,6 +226,16 @@ EOT;
         return true;
         }
 
+    protected function addTableColumn (string $tableName, string $columnName, string $type, string &$error = null) : bool
+        {
+        $sql = "ALTER TABLE `$tableName` ADD COLUMN `$columnName` $type";
+        $success = @$this->db->exec($sql);
+        if (!$this->checkExecutionError ($success, $sql, $error))
+            return false;
+
+        return true;
+        }
+
     public function executeInsert (string $tableName, string $colsWithValues, &$error)
         {
         // TODO: implement permission check

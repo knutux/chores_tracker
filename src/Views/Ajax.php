@@ -50,6 +50,10 @@ class Ajax
                 $id = self::getIntegerParam($postArgs, 'id');
                 $result = $model->markTaskDone ($db, $id, self::getBooleanParam($postArgs, 'today', true));
                 break;
+            case "skip":
+                $id = self::getIntegerParam($postArgs, 'id');
+                $result = $model->skipTask ($db, $id);
+                break;
             case "archive":
                 $id = self::getIntegerParam($postArgs, 'id');
                 $undo = self::getBooleanParam($postArgs, 'undo');

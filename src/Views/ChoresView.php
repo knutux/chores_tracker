@@ -63,6 +63,12 @@ class ChoresView
               +archived
             </label>
         </div>
+        <div class="text-right form-check">
+            <input class="form-check-input" type="checkbox" value="" id="show_skipped" data-bind="checked:showSkipped">
+            <label class="small form-check-label" for="show_skipped">
+              +skipped
+            </label>
+        </div>
         <input type="text" class="form-control form-control-sm" id="search-input" placeholder="Search..." data-bind="value: textFilter">
         <button role="button" data-bind="attr: { disabled: selectedCategory() == 0 }, click: createTask" class="btn btn-secondary"><i class="fa fa-plus"></i> Add new</button>
       </div>
@@ -73,7 +79,7 @@ class ChoresView
             <tr>
                 <td width="50%">Label
                 </td>
-                <td width="10%">Next Date</td>
+                <td width="15%">Next Date</td>
                 <td width="10%">
                     Frequency
                     <br>
@@ -84,7 +90,7 @@ class ChoresView
                     <br>
                     <span class="small"><span data-bind="text: minutesPerDay"></span> per day</span>
                 </td>
-                <td width="10%">Actions
+                <td width="20%">Actions
                     <br>
                     <span class="small"><span data-bind="text: minutesToday"></span> left</span>
                 </td>
@@ -96,11 +102,12 @@ class ChoresView
                     <span data-bind="text: label"></span>
                     <button class="btn btn-xs btn-link" data-bind="popover: { title: 'Notes', content: notes}"><i class="fa fa-file"></i></button>
                 </td>
-                <td data-bind="css: { 'bg-success' : !archived() && diff() < -1, 'bg-danger': !archived() && diff() > frequency(), 'bg-warning': !archived() && diff() > 0, 'bg-secondary': !archived() && diff()==0, 'bg-info': !archived() && diff()==-1, 'text-muted' : archived}"  class="text-center">
+                <td data-bind="css: { 'bg-success' : !archived() && !skipped() && diff() < -1, 'bg-danger': !archived() && !skipped() && diff() > frequency(), 'bg-warning': !archived() && !skipped() && diff() > 0, 'bg-secondary': !archived() && skipped() && diff()==0, 'bg-info': !archived() && diff()==-1, 'text-muted' : archived() || skipped()}"  class="text-center">
                     <div data-bind="text: nextDate">
                     </div>
                     <div data-bind="if: archived">Archived</div>
-                    <div data-bind="ifnot: archived">
+                    <div data-bind="if: skipped">Skipped</div>
+                    <div data-bind="ifnot: archived() || skipped()">
                     (<span data-bind="if: diff() > 0">overdue <span data-bind="text: diff"></span> days</span
                     ><span data-bind="if: diff() < -1">due in <span data-bind="text: Math.abs(diff())"></span> days</span
                     ><span data-bind="if: diff() == -1">due tomorrow</span
@@ -117,11 +124,16 @@ class ChoresView
                         <div class="small" data-bind="text: timePerDayH, css: { 'text-danger': timePerDay() >= 30, 'text-warning': timePerDay() >= 10 }"></div>
                     </div>
                 </td>
-                <td class="btn-group" role="group" aria-label="Actions">
+                <td class="btn-group btn-group-lg" role="group" aria-label="Actions">
                     <button role="button" data-bind="click:markDone, disabled: executing, css: {disabled: executing}" class="btn btn-success">
                         <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
                         <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
                         Done
+                    </button>
+                    <button role="button" data-bind="click:skipTask, disabled: executing, css: {disabled: executing}" class="btn btn-secondary">
+                        <span data-bind="ifnot:executing"><i class="fa fa-check"></i></span></span>
+                        <span data-bind="if:executing"><i class="fa fa-spinner fa-spin"></i></span>
+                        Skip
                     </button>
                     <div class="btn-group" role="group">
                         <button id="btnGroupDrop1" data-bind="disabled: executing, css: {disabled: executing}" type="button" class="btn btn-light dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -269,7 +281,11 @@ class ChoresView
             {
             ajaxCall(model.baseUrl, 'done', { id: row.id(), today: 1 }, model, row.executing, updateRow);
             }
-        row.timePerDay = ko.computed (function ()
+         row.skipTask = function ()
+            {
+            ajaxCall(model.baseUrl, 'skip', { id: row.id(), today: 1 }, model, row.executing, updateRow);
+            }
+       row.timePerDay = ko.computed (function ()
             {
             var cost = row.cost();
             if (0 == cost || null == cost)
@@ -357,12 +373,15 @@ class ChoresView
             return $.grep ($model.flatAllTasks(), filter); //.sort(function (a, b) { return b.diff() - a.diff(); });
             });
         $model.showArchived = ko.observable (false);
+        $model.showSkipped = ko.observable (false);
         adjustTasks($model);
         $model.selectedTasks = ko.computed (function ()
             {
             var filter = function (el)
                 {
                 if (!$model.showArchived() && ko.unwrap(ko.unwrap(el).archived))
+                    return false;
+                if (!$model.showSkipped() && ko.unwrap(ko.unwrap(el).skipped))
                     return false;
                 if ($model.textFilter().length == 0)
                     {
